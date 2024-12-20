@@ -38,12 +38,38 @@ impl Lexer {
         self.skip_whitespace();
 
         let tok = match self.ch {
-            '=' => Token::new(TokenType::Assign, self.ch),
+            '=' => {
+                if self.peek_char() == '=' {
+                    self.read_char();
+                    Token {
+                        token_type : TokenType::Eq,
+                        literal: String::from("=="),
+                    }
+                } else {
+                    Token::new(TokenType::Assign, self.ch)
+                }
+            },
             ';' => Token::new(TokenType::SemiColon, self.ch),
             '(' => Token::new(TokenType::Lparen, self.ch),
             ')' => Token::new(TokenType::Rparen, self.ch),
             ',' => Token::new(TokenType::Comma, self.ch),
             '+' => Token::new(TokenType::Plus, self.ch),
+            '-' => Token::new(TokenType::Minus, self.ch),
+            '!' =>  {
+                if self.peek_char() == '=' {
+                    self.read_char();
+                    Token {
+                        token_type : TokenType::NotEq,
+                        literal : String::from("!="),
+                    }
+                } else {
+                    Token::new(TokenType::Bang, self.ch)
+                }
+            },
+            '/' => Token::new(TokenType::Slash, self.ch),
+            '*' => Token::new(TokenType::Asterisk, self.ch),
+            '<' => Token::new(TokenType::LessThan, self.ch),
+            '>' => Token::new(TokenType::GreaterThan, self.ch),
             '{' => Token::new(TokenType::Lbrace, self.ch),
             '}' => Token::new(TokenType::Rbrace, self.ch),
             '\0' => Token {
@@ -105,6 +131,14 @@ impl Lexer {
             self.read_char();
         }
     }
+
+    fn peek_char(&self) -> char {
+        if self.read_position >= self.input.len() {
+            '\0'
+        } else {
+            self.input.chars().nth(self.read_position).unwrap()
+        }
+    }
 }
 
 #[cfg(test)]
@@ -123,6 +157,17 @@ mod tests {
           };
 
           let result = add(five, ten);
+          !-/*5;
+          5 < 10 > 5;
+
+          if (5 < 10) {
+            return true;
+          } else {
+            return false;
+          }
+
+          10 == 10;
+          10 != 9;
         "#);
 
         let tests: Vec<(TokenType, &str)> = vec![
@@ -161,6 +206,43 @@ mod tests {
             (TokenType::Comma, ","),
             (TokenType::Ident, "ten"),
             (TokenType::Rparen, ")"),
+            (TokenType::SemiColon, ";"),
+            (TokenType::Bang, "!"),
+            (TokenType::Minus, "-"),
+            (TokenType::Slash, "/"),
+            (TokenType::Asterisk, "*"),
+            (TokenType::Int, "5"),
+            (TokenType::SemiColon, ";"),
+            (TokenType::Int, "5"),
+            (TokenType::LessThan, "<"),
+            (TokenType::Int, "10"),
+            (TokenType::GreaterThan, ">"),
+            (TokenType::Int, "5"),
+            (TokenType::SemiColon, ";"),
+            (TokenType::If, "if"),
+            (TokenType::Lparen, "("),
+            (TokenType::Int, "5"),
+            (TokenType::LessThan, "<"),
+            (TokenType::Int, "10"),
+            (TokenType::Rparen, ")"),
+            (TokenType::Lbrace, "{"),
+            (TokenType::Return, "return"),
+            (TokenType::True, "true"),
+            (TokenType::SemiColon, ";"),
+            (TokenType::Rbrace, "}"),
+            (TokenType::Else, "else"),
+            (TokenType::Lbrace, "{"),
+            (TokenType::Return, "return"),
+            (TokenType::False, "false"),
+            (TokenType::SemiColon, ";"),
+            (TokenType::Rbrace, "}"),
+            (TokenType::Int, "10"),
+            (TokenType::Eq, "=="),
+            (TokenType::Int, "10"),
+            (TokenType::SemiColon, ";"),
+            (TokenType::Int, "10"),
+            (TokenType::NotEq, "!="),
+            (TokenType::Int, "9"),
             (TokenType::SemiColon, ";"),
             (TokenType::Eof, ""),
         ];

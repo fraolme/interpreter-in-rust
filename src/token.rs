@@ -23,15 +23,28 @@ pub enum TokenType {
     Int,
     Assign,
     Plus,
+    Minus,
+    Bang,
+    Asterisk,
+    Slash,
+    LessThan,
+    GreaterThan,
     Comma,
     SemiColon,
     Lparen,
     Rparen,
     Lbrace,
     Rbrace,
+    Eq,
+    NotEq,
     // keywords
     Function,
     Let,
+    True,
+    False,
+    If,
+    Else,
+    Return,
 }
 
 impl TokenType {
@@ -40,6 +53,11 @@ impl TokenType {
         match ident {
             "fn" => TokenType::Function,
             "let" => TokenType::Let,
+            "true" => TokenType::True,
+            "false" => TokenType::False,
+            "if" => TokenType::If,
+            "else" => TokenType::Else,
+            "return" => TokenType::Return,
             _ => TokenType::Ident,
         }
     }
@@ -54,14 +72,27 @@ impl fmt::Display for TokenType {
             TokenType::Int => "INT",
             TokenType::Assign => "=",
             TokenType::Plus => "+",
+            TokenType::Minus => "-",
+            TokenType::Bang => "!",
+            TokenType::Asterisk => "*",
+            TokenType::Slash => "/",
+            TokenType::LessThan => "<",
+            TokenType::GreaterThan => ">",
             TokenType::Comma => ",",
             TokenType::SemiColon => ";",
             TokenType::Lparen => "(",
             TokenType::Rparen => ")",
             TokenType::Lbrace => "{",
             TokenType::Rbrace => "}",
+            TokenType::Eq => "==",
+            TokenType::NotEq => "!=",
             TokenType::Function => "FUNCTION",
             TokenType::Let => "LET",
+            TokenType::True => "true",
+            TokenType::False => "false",
+            TokenType::If => "if",
+            TokenType::Else => "else",
+            TokenType::Return => "return",
         };
 
         write!(f, "{}", str_val)
