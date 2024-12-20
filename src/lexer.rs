@@ -32,6 +32,11 @@ impl Lexer {
     }
 
     fn next_token(&mut self) -> Token {
+
+        let mut pointer_moved = false;
+
+        self.skip_whitespace();
+
         let tok = match self.ch {
             '=' => Token::new(TokenType::Assign, self.ch),
             ';' => Token::new(TokenType::SemiColon, self.ch),
@@ -45,11 +50,60 @@ impl Lexer {
                 token_type: TokenType::Eof,
                 literal: String::from(""),
             },
-            _ => Token::new(TokenType::Illegal, self.ch),
+            _ => {
+                if Lexer::is_letter(self.ch) {
+                    pointer_moved = true;
+                    let identifier = self.read_identifier();
+                    let token_type = TokenType::lookup_ident(&identifier);
+                    Token {
+                        token_type : token_type,
+                        literal : identifier,
+                    }
+                } else if self.ch.is_ascii_digit() {
+                    pointer_moved = true;
+                    Token {
+                        token_type : TokenType::Int,
+                        literal : self.read_number()
+                    }
+                } else {
+                    Token::new(TokenType::Illegal, self.ch)
+                }
+            }
         };
 
-        self.read_char();
+        if !pointer_moved {
+            self.read_char();
+        }
+
         tok
+    }
+
+    fn is_letter(ch: char) -> bool {
+        ch.is_ascii_alphabetic() || ch == '_'
+    }
+
+    fn read_identifier(&mut self) -> String {
+        let position = self.position;
+        while Lexer::is_letter(self.ch) {
+            self.read_char();
+        }
+
+        self.input[position..self.position].to_string()
+    }
+
+    fn read_number(&mut self) -> String {
+        let position = self.position;
+        while self.ch.is_ascii_digit() {
+            self.read_char();
+        }
+
+        self.input[position..self.position].to_string()
+    }
+
+    fn skip_whitespace(&mut self) {
+        while self.ch.is_ascii_whitespace() {
+            self.read_char();
+        }
     }
 }
 
@@ -60,16 +114,53 @@ mod tests {
 
     #[test]
     fn test_next_token() {
-        let input = String::from("=+(){},;");
+        let input = String::from(r#"
+          let five = 5;
+          let ten = 10;
+
+          let add = fn(x, y) {
+            x + y;
+          };
+
+          let result = add(five, ten);
+        "#);
 
         let tests: Vec<(TokenType, &str)> = vec![
+            (TokenType::Let, "let"),
+            (TokenType::Ident, "five"),
             (TokenType::Assign, "="),
-            (TokenType::Plus, "+"),
+            (TokenType::Int, "5"),
+            (TokenType::SemiColon, ";"),
+            (TokenType::Let, "let"),
+            (TokenType::Ident, "ten"),
+            (TokenType::Assign, "="),
+            (TokenType::Int, "10"),
+            (TokenType::SemiColon, ";"),
+            (TokenType::Let, "let"),
+            (TokenType::Ident, "add"),
+            (TokenType::Assign, "="),
+            (TokenType::Function, "fn"),
             (TokenType::Lparen, "("),
+            (TokenType::Ident, "x"),
+            (TokenType::Comma, ","),
+            (TokenType::Ident, "y"),
             (TokenType::Rparen, ")"),
             (TokenType::Lbrace, "{"),
+            (TokenType::Ident, "x"),
+            (TokenType::Plus, "+"),
+            (TokenType::Ident, "y"),
+            (TokenType::SemiColon, ";"),
             (TokenType::Rbrace, "}"),
+            (TokenType::SemiColon, ";"),
+            (TokenType::Let, "let"),
+            (TokenType::Ident, "result"),
+            (TokenType::Assign, "="),
+            (TokenType::Ident, "add"),
+            (TokenType::Lparen, "("),
+            (TokenType::Ident, "five"),
             (TokenType::Comma, ","),
+            (TokenType::Ident, "ten"),
+            (TokenType::Rparen, ")"),
             (TokenType::SemiColon, ";"),
             (TokenType::Eof, ""),
         ];

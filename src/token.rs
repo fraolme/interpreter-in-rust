@@ -34,8 +34,19 @@ pub enum TokenType {
     Let,
 }
 
+impl TokenType {
+
+    pub fn lookup_ident(ident: &str) -> TokenType {
+        match ident {
+            "fn" => TokenType::Function,
+            "let" => TokenType::Let,
+            _ => TokenType::Ident,
+        }
+    }
+}
+
 impl fmt::Display for TokenType {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let str_val = match self {
             TokenType::Illegal => "ILLEGAL",
             TokenType::Eof => "EOF",
