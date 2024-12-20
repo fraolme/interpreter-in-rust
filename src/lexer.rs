@@ -1,6 +1,6 @@
 use crate::token::{Token, TokenType};
 
-struct Lexer {
+pub struct Lexer {
     input: String,
     position: usize,      // points to current char
     read_position: usize, // points after current char
@@ -8,7 +8,7 @@ struct Lexer {
 }
 
 impl Lexer {
-    fn new(input: String) -> Self {
+    pub fn new(input: String) -> Self {
         let mut lexer = Self {
             input,
             position: 0,
@@ -31,8 +31,7 @@ impl Lexer {
         self.read_position += 1;
     }
 
-    fn next_token(&mut self) -> Token {
-
+    pub fn next_token(&mut self) -> Token {
         let mut pointer_moved = false;
 
         self.skip_whitespace();
@@ -42,30 +41,30 @@ impl Lexer {
                 if self.peek_char() == '=' {
                     self.read_char();
                     Token {
-                        token_type : TokenType::Eq,
+                        token_type: TokenType::Eq,
                         literal: String::from("=="),
                     }
                 } else {
                     Token::new(TokenType::Assign, self.ch)
                 }
-            },
+            }
             ';' => Token::new(TokenType::SemiColon, self.ch),
             '(' => Token::new(TokenType::Lparen, self.ch),
             ')' => Token::new(TokenType::Rparen, self.ch),
             ',' => Token::new(TokenType::Comma, self.ch),
             '+' => Token::new(TokenType::Plus, self.ch),
             '-' => Token::new(TokenType::Minus, self.ch),
-            '!' =>  {
+            '!' => {
                 if self.peek_char() == '=' {
                     self.read_char();
                     Token {
-                        token_type : TokenType::NotEq,
-                        literal : String::from("!="),
+                        token_type: TokenType::NotEq,
+                        literal: String::from("!="),
                     }
                 } else {
                     Token::new(TokenType::Bang, self.ch)
                 }
-            },
+            }
             '/' => Token::new(TokenType::Slash, self.ch),
             '*' => Token::new(TokenType::Asterisk, self.ch),
             '<' => Token::new(TokenType::LessThan, self.ch),
@@ -82,14 +81,14 @@ impl Lexer {
                     let identifier = self.read_identifier();
                     let token_type = TokenType::lookup_ident(&identifier);
                     Token {
-                        token_type : token_type,
-                        literal : identifier,
+                        token_type: token_type,
+                        literal: identifier,
                     }
                 } else if self.ch.is_ascii_digit() {
                     pointer_moved = true;
                     Token {
-                        token_type : TokenType::Int,
-                        literal : self.read_number()
+                        token_type: TokenType::Int,
+                        literal: self.read_number(),
                     }
                 } else {
                     Token::new(TokenType::Illegal, self.ch)
@@ -148,7 +147,8 @@ mod tests {
 
     #[test]
     fn test_next_token() {
-        let input = String::from(r#"
+        let input = String::from(
+            r#"
           let five = 5;
           let ten = 10;
 
@@ -168,7 +168,8 @@ mod tests {
 
           10 == 10;
           10 != 9;
-        "#);
+        "#,
+        );
 
         let tests: Vec<(TokenType, &str)> = vec![
             (TokenType::Let, "let"),

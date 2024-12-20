@@ -48,7 +48,6 @@ pub enum TokenType {
 }
 
 impl TokenType {
-
     pub fn lookup_ident(ident: &str) -> TokenType {
         match ident {
             "fn" => TokenType::Function,
