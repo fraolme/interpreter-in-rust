@@ -14,7 +14,7 @@ pub fn start(stdin: Stdin) {
 
         stdin.read_line(&mut buffer).expect("Failed to read input");
 
-        let mut lexer = Lexer::new(buffer.clone());
+        let mut lexer = Lexer::new(buffer);
         let mut tok = lexer.next_token();
         while tok.token_type != TokenType::Eof {
             println!("{:?}", tok);
