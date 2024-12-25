@@ -1,7 +1,7 @@
 use std::fmt;
 
 //Default is useful when we use mem::take for ownership change
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct Token {
     pub token_type: TokenType,
     pub literal: String,
@@ -16,7 +16,7 @@ impl Token {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Default, Copy, Clone)]
+#[derive(Debug, PartialEq, Eq, Default, Copy, Clone, Hash)]
 pub enum TokenType {
     Illegal,
     #[default]

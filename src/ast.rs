@@ -2,7 +2,7 @@ use crate::token::Token;
 use std::fmt;
 use std::fmt::Write;
 
-pub trait Node : fmt::Display {
+pub trait Node: fmt::Display {
     fn token_literal(&self) -> &str;
     fn node_type(&self) -> NodeType;
 }
@@ -47,7 +47,7 @@ impl Node for Statement {
 
     fn node_type(&self) -> NodeType {
         match self {
-            Statement::Let(let_stmt) => let_stmt.node_type(), 
+            Statement::Let(let_stmt) => let_stmt.node_type(),
             Statement::Return(return_stmt) => return_stmt.node_type(),
             Statement::Expression(expr_stmt) => expr_stmt.node_type(),
         }
@@ -71,13 +71,13 @@ pub enum Expression {
 impl Node for Expression {
     fn token_literal(&self) -> &str {
         match self {
-            Expression::Ident(identifier) => identifier.token_literal()
+            Expression::Ident(identifier) => identifier.token_literal(),
         }
     }
 
     fn node_type(&self) -> NodeType {
         match self {
-            Expression::Ident(identifier) => identifier.node_type()
+            Expression::Ident(identifier) => identifier.node_type(),
         }
     }
 }
@@ -85,7 +85,7 @@ impl Node for Expression {
 impl fmt::Display for Expression {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Expression::Ident(identifier) => write!(f, "{}", identifier)
+            Expression::Ident(identifier) => write!(f, "{}", identifier),
         }
     }
 }
@@ -186,10 +186,10 @@ impl Node for ReturnStatement {
 }
 
 impl fmt::Display for ReturnStatement {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { 
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let mut buffer = String::new();
         write!(&mut buffer, "{} ", self.token_literal()).unwrap();
-        //TODO: add the return_value part 
+        //TODO: add the return_value part
         //write!(&mut buffer, "{};", self.name).unwrap();
         write!(f, "{}", buffer)
     }
@@ -197,7 +197,7 @@ impl fmt::Display for ReturnStatement {
 
 // for this kind of statements -> x + 10;
 pub struct ExpressionStatement {
-    pub token : Token,
+    pub token: Token,
     pub expression: Expression,
 }
 
@@ -216,4 +216,3 @@ impl fmt::Display for ExpressionStatement {
         write!(f, "{}", self.expression)
     }
 }
-
