@@ -6,20 +6,43 @@ pub trait Node {
     fn node_type(&self) -> NodeType;
 }
 
+#[derive(Debug, PartialEq, Eq)]
+pub enum NodeType {
+    Program,
+    Let,
+    Identifier,
+    Return,
+}
+
+impl fmt::Display for NodeType {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let val = match self {
+            NodeType::Program => "program",
+            NodeType::Let => "let",
+            NodeType::Identifier => "identifier",
+            NodeType::Return => "return",
+        };
+
+        write!(f, "{}", val)
+    }
+}
 pub enum Statement {
     Let(LetStatement),
+    Return(ReturnStatement),
 }
 
 impl Node for Statement {
     fn token_literal(&self) -> &str {
         match self {
-            Statement::Let(let_statement) => let_statement.token_literal()
+            Statement::Let(let_statement) => let_statement.token_literal(),
+            Statement::Return(return_statement) => return_statement.token_literal(),
         }
     }
 
     fn node_type(&self) -> NodeType {
         match self {
-            Statement::Let(let_statement) => let_statement.node_type() 
+            Statement::Let(let_statement) => let_statement.node_type(), 
+            Statement::Return(return_statement) => return_statement.node_type(),
         }
     }
 }
@@ -42,33 +65,14 @@ impl Node for Expression {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
-pub enum NodeType {
-    Program,
-    Let,
-    Identifier,
-}
-
-impl fmt::Display for NodeType {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let val = match self {
-            NodeType::Program => "program",
-            NodeType::Let => "let",
-            NodeType::Identifier => "identifier",
-        };
-
-        write!(f, "{}", val)
-    }
-}
-
 pub struct Program {
-    pub statements: Vec<Option<Statement>>,
+    pub statements: Vec<Statement>,
 }
 
 impl Node for Program {
     fn token_literal(&self) -> &str {
         if self.statements.len() > 0 {
-            self.statements[0].as_ref().map(|d| d.token_literal()).unwrap_or("")
+            self.statements[0].token_literal()
         } else {
             ""
         }
@@ -83,7 +87,7 @@ pub struct LetStatement {
     pub token: Token,
     pub name: Identifier,
     //TODO: skip expressions for now
-    //value: Box<dyn Expression>,
+    //value: Expression,
 }
 
 impl Node for LetStatement {
@@ -108,5 +112,21 @@ impl Node for Identifier {
 
     fn node_type(&self) -> NodeType {
         NodeType::Identifier
+    }
+}
+
+pub struct ReturnStatement {
+    pub token: Token,
+    //TODO: parse the expression part later
+    //pub return_value: Expression,
+}
+
+impl Node for ReturnStatement {
+    fn token_literal(&self) -> &str {
+        &self.token.literal
+    }
+
+    fn node_type(&self) -> NodeType {
+        NodeType::Return
     }
 }

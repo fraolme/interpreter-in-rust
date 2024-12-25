@@ -1,4 +1,4 @@
-use crate::ast::{NodeType, Program, Statement, Expression, LetStatement, Identifier, Node};
+use crate::ast::*;
 use crate::lexer::Lexer;
 use crate::token::{Token, TokenType};
 use std::{ mem, fmt::Write };
@@ -32,9 +32,10 @@ impl Parser {
         let mut program = Program { statements: vec![] };
 
         while self.cur_token.token_type != TokenType::Eof {
-            let statement = self.parse_statement();
+            if let Some(statement) = self.parse_statement() {
+                program.statements.push(statement);
+            }
 
-            program.statements.push(statement);
             self.next_token();
         }
 
@@ -44,6 +45,7 @@ impl Parser {
     fn parse_statement(&mut self) -> Option<Statement> {
         match self.cur_token.token_type {
             TokenType::Let => self.parse_let_statement(),
+            TokenType::Return => self.parse_return_statement(),
             _ => None
         }
     }
@@ -71,6 +73,22 @@ impl Parser {
         Some(Statement::Let(LetStatement {
             token: let_token,
             name: identifier,
+        }))
+    }
+
+    fn parse_return_statement(&mut self) -> Option<Statement> {
+        let return_token = mem::take(&mut self.cur_token);
+
+        self.next_token();
+
+        //TODO: parse the expression part
+
+        while !self.cur_token_is(TokenType::SemiColon) {
+            self.next_token();
+        }
+
+        Some(Statement::Return(ReturnStatement {
+            token: return_token
         }))
     }
 
@@ -125,7 +143,7 @@ mod tests {
 
         let tests = ["x", "y", "foobar"];
         for (index, expected_identifier) in tests.iter().enumerate() {
-            let stmt = program.statements[index].as_ref().unwrap();
+            let stmt = &program.statements[index];
             let token_literal = stmt.token_literal();
             let node_type = stmt.node_type();
             assert_eq!(
@@ -139,15 +157,45 @@ mod tests {
                 "stmt is not ast::LetStatement. got = {node_type}"
             );
 
-            let Statement::Let(let_statement) = stmt;
+            if let Statement::Let(let_statement) = stmt {
                 let ident_val = &let_statement.name.value;
                 let ident_literal = &let_statement.name.token_literal();
                 assert_eq!(ident_val, expected_identifier, "let_statment.name.value not {expected_identifier}. got={ident_val}");
 
                 assert_eq!(ident_literal, expected_identifier, "let_statement.name.token_literal() not {expected_identifier}. got={ident_literal}");
+            }
         }
     }
 
+    #[test]
+    fn test_return_statements() {
+        let input = r#"
+            return 5;
+            return 10;
+            return 993322;
+        "#;
+        let lexer = Lexer::new(String::from(input));
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse_program();
+        check_parser_errors(&parser);
+
+        let statements_count = program.statements.len();
+        assert_eq!(
+            statements_count, 3,
+            "program.Statements does not contain 3 statements. got={statements_count}"
+        );
+
+        for stmt in program.statements {
+            let node_type = stmt.node_type();
+            assert_eq!(node_type, NodeType::Return, "stmt not ast.ReturnStatement. got={node_type}");
+            if let Statement::Return(return_statement) = stmt {
+                let return_token_literal = return_statement.token_literal();
+                assert_eq!(return_token_literal, "return", "return_statement.token_literal not 'return', got {return_token_literal}");
+            }
+        }
+    }
+
+    // helper methods
     fn check_parser_errors(parser: &Parser) {
         let error_len = parser.errors.len();
 
