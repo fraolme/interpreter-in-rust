@@ -14,6 +14,7 @@ pub enum NodeType {
     Identifier,
     Return,
     ExpressionStatement,
+    IntegerLiteral,
 }
 
 impl fmt::Display for NodeType {
@@ -24,6 +25,7 @@ impl fmt::Display for NodeType {
             NodeType::Identifier => "identifier",
             NodeType::Return => "return",
             NodeType::ExpressionStatement => "expression_statement",
+            NodeType::IntegerLiteral => "integer",
         };
 
         write!(f, "{}", val)
@@ -66,18 +68,21 @@ impl fmt::Display for Statement {
 
 pub enum Expression {
     Ident(Identifier),
+    Int(IntegerLiteral),
 }
 
 impl Node for Expression {
     fn token_literal(&self) -> &str {
         match self {
             Expression::Ident(identifier) => identifier.token_literal(),
+            Expression::Int(int_literal) => int_literal.token_literal(),
         }
     }
 
     fn node_type(&self) -> NodeType {
         match self {
             Expression::Ident(identifier) => identifier.node_type(),
+            Expression::Int(int_literal) => int_literal.node_type(),
         }
     }
 }
@@ -86,6 +91,7 @@ impl fmt::Display for Expression {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Expression::Ident(identifier) => write!(f, "{}", identifier),
+            Expression::Int(int_literal) => write!(f, "{}", int_literal),
         }
     }
 }
@@ -214,5 +220,26 @@ impl Node for ExpressionStatement {
 impl fmt::Display for ExpressionStatement {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.expression)
+    }
+}
+
+pub struct IntegerLiteral {
+    pub token: Token,
+    pub value: i64,
+}
+
+impl Node for IntegerLiteral {
+    fn token_literal(&self) -> &str {
+        &self.token.literal
+    }
+
+    fn node_type(&self) -> NodeType {
+        NodeType::IntegerLiteral
+    }
+}
+
+impl fmt::Display for IntegerLiteral {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.value)
     }
 }

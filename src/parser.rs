@@ -3,8 +3,8 @@ use crate::lexer::Lexer;
 use crate::token::{Token, TokenType};
 use std::{collections::HashMap, fmt::Write, mem};
 
-type PrefixParseFn = fn(&mut Parser) -> Expression;
-type InfixParseFn = fn(&mut Parser, Expression) -> Expression;
+type PrefixParseFn = fn(&mut Parser) -> Option<Expression>;
+type InfixParseFn = fn(&mut Parser, Expression) -> Option<Expression>;
 
 #[derive(PartialEq, Eq)]
 enum Precedence {
@@ -48,6 +48,7 @@ impl Parser {
 
     fn register_prefix_infix_fns(&mut self) {
         self.register_prefix(TokenType::Ident, Parser::parse_identifier);
+        self.register_prefix(TokenType::Int, Parser::parse_integer_literal);
     }
 
     fn parse_program(&mut self) -> Program {
@@ -135,20 +136,29 @@ impl Parser {
 
     fn parse_expression(&mut self, precedence: Precedence) -> Option<Expression> {
         let prefix_fn = self.prefix_parse_fns.get(&self.cur_token.token_type)?;
-        
+
         let left_exp = prefix_fn(self);
 
-        Some(left_exp)
+        left_exp
     }
 
-    fn parse_identifier(&mut self) -> Expression {
+    fn parse_identifier(&mut self) -> Option<Expression> {
         let identifier_value = self.cur_token.literal.clone();
         let identifier_token = mem::take(&mut self.cur_token);
 
-        Expression::Ident(Identifier {
+        Some(Expression::Ident(Identifier {
             token: identifier_token,
             value: identifier_value,
-        })
+        }))
+    }
+
+    fn parse_integer_literal(&mut self) -> Option<Expression> {
+        let num_val: i64 = self.cur_token.literal.parse().ok()?;
+
+        Some(Expression::Int(IntegerLiteral {
+            token: mem::take(&mut self.cur_token),
+            value: num_val,
+        }))
     }
 
     // helper functions
@@ -315,6 +325,52 @@ mod tests {
                 assert_eq!(
                     ident_token_literal, "foobar",
                     "ident.token_literal() not foobar, got={ident_token_literal}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_integer_literal_expression() {
+        let input = "5;";
+        let lexer = Lexer::new(input.to_string());
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse_program();
+        check_parser_errors(&parser);
+
+        assert_eq!(
+            program.statements.len(),
+            1,
+            "program doesn't have enough statements. got={}",
+            program.statements.len()
+        );
+        assert_eq!(
+            program.statements[0].node_type(),
+            NodeType::ExpressionStatement,
+            "program.statements[0] is not NodeType::ExpressionSttaement. got={}",
+            program.statements[0].node_type()
+        );
+
+        if let Statement::Expression(expr_stmt) = &program.statements[0] {
+            assert_eq!(
+                expr_stmt.expression.node_type(),
+                NodeType::IntegerLiteral,
+                "exp nit ast::IntegerLiteral. got={}",
+                expr_stmt.expression.node_type()
+            );
+
+            if let Expression::Int(int_literal) = &expr_stmt.expression {
+                assert_eq!(
+                    int_literal.value, 5,
+                    "int_literal.value not {}. got={}",
+                    5, int_literal.value
+                );
+                assert_eq!(
+                    int_literal.token_literal(),
+                    "5",
+                    "int_literal.token_literal not {}. got={}",
+                    "5",
+                    int_literal.token_literal()
                 );
             }
         }
