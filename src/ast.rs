@@ -15,6 +15,7 @@ pub enum NodeType {
     Return,
     ExpressionStatement,
     IntegerLiteral,
+    PrefixExpression,
 }
 
 impl fmt::Display for NodeType {
@@ -26,6 +27,7 @@ impl fmt::Display for NodeType {
             NodeType::Return => "return",
             NodeType::ExpressionStatement => "expression_statement",
             NodeType::IntegerLiteral => "integer",
+            NodeType::PrefixExpression => "prefix",
         };
 
         write!(f, "{}", val)
@@ -69,6 +71,7 @@ impl fmt::Display for Statement {
 pub enum Expression {
     Ident(Identifier),
     Int(IntegerLiteral),
+    Prefix(Box<PrefixExpression>),
 }
 
 impl Node for Expression {
@@ -76,6 +79,7 @@ impl Node for Expression {
         match self {
             Expression::Ident(identifier) => identifier.token_literal(),
             Expression::Int(int_literal) => int_literal.token_literal(),
+            Expression::Prefix(prefix) => prefix.token_literal(),
         }
     }
 
@@ -83,6 +87,7 @@ impl Node for Expression {
         match self {
             Expression::Ident(identifier) => identifier.node_type(),
             Expression::Int(int_literal) => int_literal.node_type(),
+            Expression::Prefix(prefix) => prefix.node_type(),
         }
     }
 }
@@ -92,6 +97,7 @@ impl fmt::Display for Expression {
         match self {
             Expression::Ident(identifier) => write!(f, "{}", identifier),
             Expression::Int(int_literal) => write!(f, "{}", int_literal),
+            Expression::Prefix(prefix) => write!(f, "{}", prefix),
         }
     }
 }
@@ -241,5 +247,27 @@ impl Node for IntegerLiteral {
 impl fmt::Display for IntegerLiteral {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.value)
+    }
+}
+
+pub struct PrefixExpression {
+    pub token: Token,
+    pub operator: String,
+    pub right: Box<Expression>,
+}
+
+impl Node for PrefixExpression {
+    fn token_literal(&self) -> &str {
+        &self.token.literal
+    }
+
+    fn node_type(&self) -> NodeType {
+        NodeType::PrefixExpression
+    }
+}
+
+impl fmt::Display for PrefixExpression {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "({}{})", self.operator, self.right)
     }
 }

@@ -49,6 +49,8 @@ impl Parser {
     fn register_prefix_infix_fns(&mut self) {
         self.register_prefix(TokenType::Ident, Parser::parse_identifier);
         self.register_prefix(TokenType::Int, Parser::parse_integer_literal);
+        self.register_prefix(TokenType::Bang, Parser::parse_prefix_expression);
+        self.register_prefix(TokenType::Minus, Parser::parse_prefix_expression);
     }
 
     fn parse_program(&mut self) -> Program {
@@ -135,11 +137,17 @@ impl Parser {
     }
 
     fn parse_expression(&mut self, precedence: Precedence) -> Option<Expression> {
-        let prefix_fn = self.prefix_parse_fns.get(&self.cur_token.token_type)?;
+        if let Some(prefix_fn) = self.prefix_parse_fns.get(&self.cur_token.token_type) {
+            let left_exp = prefix_fn(self);
+            left_exp
+        } else {
+            self.errors.push(format!(
+                "no prefix parse function for {} found",
+                &self.cur_token.token_type
+            ));
 
-        let left_exp = prefix_fn(self);
-
-        left_exp
+            None
+        }
     }
 
     fn parse_identifier(&mut self) -> Option<Expression> {
@@ -159,6 +167,19 @@ impl Parser {
             token: mem::take(&mut self.cur_token),
             value: num_val,
         }))
+    }
+
+    fn parse_prefix_expression(&mut self) -> Option<Expression> {
+        let operator = self.cur_token.literal.to_string();
+        let cur_token = mem::take(&mut self.cur_token);
+        self.next_token();
+        let right_expr = self.parse_expression(Precedence::Prefix)?;
+
+        Some(Expression::Prefix(Box::new(PrefixExpression {
+            token: cur_token,
+            operator: operator,
+            right: Box::new(right_expr),
+        })))
     }
 
     // helper functions
@@ -376,6 +397,52 @@ mod tests {
         }
     }
 
+    #[test]
+    fn test_parsing_prefix_expressions() {
+        let prefix_tests: [(&str, &str, i64); 2] = [("!5;", "!", 5), ("-15;", "-", 15)];
+
+        for (input, operator, int_val) in prefix_tests {
+            let lexer = Lexer::new(input.to_string());
+            let mut parser = Parser::new(lexer);
+            let program = parser.parse_program();
+            check_parser_errors(&parser);
+
+            assert_eq!(
+                program.statements.len(),
+                1,
+                "program.statements does not contain {} statements. got={}",
+                1,
+                program.statements.len()
+            );
+
+            assert_eq!(
+                program.statements[0].node_type(),
+                NodeType::ExpressionStatement,
+                "program.statements[0] is not ast::ExpressionStatement. got={}",
+                program.statements[0].node_type()
+            );
+
+            if let Statement::Expression(expr_stmt) = &program.statements[0] {
+                assert_eq!(
+                    expr_stmt.expression.node_type(),
+                    NodeType::PrefixExpression,
+                    "stmt is not ast::PrefixExpression. got={}",
+                    expr_stmt.expression.node_type()
+                );
+
+                if let Expression::Prefix(exp) = &expr_stmt.expression {
+                    assert_eq!(
+                        exp.operator, operator,
+                        "exp.operator is not {}. got={}",
+                        operator, exp.operator
+                    );
+
+                    test_integer_literal(exp.right.as_ref(), int_val);
+                }
+            }
+        }
+    }
+
     // helper methods
     fn check_parser_errors(parser: &Parser) {
         let error_len = parser.errors.len();
@@ -392,5 +459,30 @@ mod tests {
         }
 
         assert_eq!(error_len, 0, "{}", buffer);
+    }
+
+    fn test_integer_literal(int_exp: &Expression, val: i64) {
+        assert_eq!(
+            int_exp.node_type(),
+            NodeType::IntegerLiteral,
+            "il not ast::IntegerLiteral. got={}",
+            int_exp
+        );
+
+        if let Expression::Int(integ) = &int_exp {
+            assert_eq!(
+                integ.value, val,
+                "integ.value not {}. got={}",
+                val, integ.value
+            );
+
+            assert_eq!(
+                integ.token_literal(),
+                val.to_string(),
+                "integ.token_literal() not {}. got={}",
+                val,
+                integ.token_literal()
+            );
+        }
     }
 }
