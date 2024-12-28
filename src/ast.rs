@@ -18,6 +18,8 @@ pub enum NodeType {
     PrefixExpression,
     InfixExpression,
     BooleanLiteral,
+    IfExpression,
+    BlockStatement,
 }
 
 impl fmt::Display for NodeType {
@@ -32,6 +34,8 @@ impl fmt::Display for NodeType {
             NodeType::PrefixExpression => "prefix",
             NodeType::InfixExpression => "infix",
             NodeType::BooleanLiteral => "boolean",
+            NodeType::IfExpression => "if",
+            NodeType::BlockStatement => "block_statement",
         };
 
         write!(f, "{}", val)
@@ -42,6 +46,7 @@ pub enum Statement {
     Let(LetStatement),
     Return(ReturnStatement),
     Expression(ExpressionStatement),
+    Block(BlockStatement),
 }
 
 impl Node for Statement {
@@ -50,6 +55,7 @@ impl Node for Statement {
             Statement::Let(let_stmt) => let_stmt.token_literal(),
             Statement::Return(return_stmt) => return_stmt.token_literal(),
             Statement::Expression(expr_stmt) => expr_stmt.token_literal(),
+            Statement::Block(block) => block.token_literal(),
         }
     }
 
@@ -58,6 +64,7 @@ impl Node for Statement {
             Statement::Let(let_stmt) => let_stmt.node_type(),
             Statement::Return(return_stmt) => return_stmt.node_type(),
             Statement::Expression(expr_stmt) => expr_stmt.node_type(),
+            Statement::Block(block) => block.node_type(),
         }
     }
 }
@@ -68,6 +75,7 @@ impl fmt::Display for Statement {
             Statement::Let(let_stmt) => write!(f, "{}", let_stmt),
             Statement::Return(return_stmt) => write!(f, "{}", return_stmt),
             Statement::Expression(expr_stmt) => write!(f, "{}", expr_stmt),
+            Statement::Block(block_stmt) => write!(f, "{}", block_stmt),
         }
     }
 }
@@ -78,6 +86,7 @@ pub enum Expression {
     Prefix(Box<PrefixExpression>),
     Infix(Box<InfixExpression>),
     Boolean(BooleanLiteral),
+    If(Box<IfExpression>),
 }
 
 impl Node for Expression {
@@ -88,6 +97,7 @@ impl Node for Expression {
             Expression::Prefix(prefix) => prefix.token_literal(),
             Expression::Infix(infix) => infix.token_literal(),
             Expression::Boolean(bol_lit) => bol_lit.token_literal(),
+            Expression::If(if_exp) => if_exp.token_literal(),
         }
     }
 
@@ -98,6 +108,7 @@ impl Node for Expression {
             Expression::Prefix(prefix) => prefix.node_type(),
             Expression::Infix(infix) => infix.node_type(),
             Expression::Boolean(bol_lit) => bol_lit.node_type(),
+            Expression::If(if_exp) => if_exp.node_type(),
         }
     }
 }
@@ -110,6 +121,7 @@ impl fmt::Display for Expression {
             Expression::Prefix(prefix) => write!(f, "{}", prefix),
             Expression::Infix(infix) => write!(f, "{}", infix),
             Expression::Boolean(bol_lit) => write!(f, "{}", bol_lit),
+            Expression::If(if_exp) => write!(f, "{}", if_exp),
         }
     }
 }
@@ -325,5 +337,60 @@ impl Node for BooleanLiteral {
 impl fmt::Display for BooleanLiteral {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.value)
+    }
+}
+
+pub struct IfExpression {
+    pub token: Token, // if token
+    pub condition: Box<Expression>,
+    pub consequence: BlockStatement,
+    pub alternative: Option<BlockStatement>,
+}
+
+impl Node for IfExpression {
+    fn token_literal(&self) -> &str {
+        &self.token.literal
+    }
+
+    fn node_type(&self) -> NodeType {
+        NodeType::IfExpression
+    }
+}
+
+impl fmt::Display for IfExpression {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let mut buffer = String::new();
+        write!(&mut buffer, "if {} {}", self.condition, self.consequence)?;
+        if let Some(alt) = &self.alternative {
+            write!(&mut buffer, "else {}", alt)?;
+        }
+
+        write!(f, "{}", buffer)
+    }
+}
+
+pub struct BlockStatement {
+    pub token: Token, // { token
+    pub statements: Vec<Statement>,
+}
+
+impl Node for BlockStatement {
+    fn token_literal(&self) -> &str {
+        &self.token.literal
+    }
+
+    fn node_type(&self) -> NodeType {
+        NodeType::BlockStatement
+    }
+}
+
+impl fmt::Display for BlockStatement {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let mut buffer = String::new();
+        for stmt in &self.statements {
+            write!(&mut buffer, "{}", stmt)?;
+        }
+
+        write!(f, "{}", buffer)
     }
 }

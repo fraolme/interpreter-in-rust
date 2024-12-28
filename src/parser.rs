@@ -49,6 +49,8 @@ impl Parser {
         prefix_parse_fns.insert(TokenType::Minus, Parser::parse_prefix_expression);
         prefix_parse_fns.insert(TokenType::True, Parser::parse_boolean);
         prefix_parse_fns.insert(TokenType::False, Parser::parse_boolean);
+        prefix_parse_fns.insert(TokenType::Lparen, Parser::parse_grouped_expression);
+        prefix_parse_fns.insert(TokenType::If, Parser::parse_if_expression);
 
         let mut infix_parse_fns: HashMap<TokenType, InfixParseFn> = HashMap::new();
         infix_parse_fns.insert(TokenType::Plus, Parser::parse_infix_expression);
@@ -236,6 +238,73 @@ impl Parser {
             operator: operator,
             right: Box::new(right),
         })))
+    }
+
+    fn parse_grouped_expression(&mut self) -> Option<Expression> {
+        self.next_token();
+
+        let exp = self.parse_expression(Precedence::Lowest)?;
+
+        if !self.expect_peek(TokenType::Rparen) {
+            return None;
+        }
+
+        Some(exp)
+    }
+
+    fn parse_if_expression(&mut self) -> Option<Expression> {
+        let cur_token = mem::take(&mut self.cur_token);
+        if !self.expect_peek(TokenType::Lparen) {
+            return None;
+        }
+
+        self.next_token();
+        let condition = self.parse_expression(Precedence::Lowest)?;
+
+        if !self.expect_peek(TokenType::Rparen) {
+            return None;
+        }
+
+        if !self.expect_peek(TokenType::Lbrace) {
+            return None;
+        }
+
+        let consequence = self.parse_block_statement();
+        let mut alternative: Option<BlockStatement> = None;
+
+        if self.peek_token_is(TokenType::Else) {
+            self.next_token();
+            if !self.expect_peek(TokenType::Lbrace) {
+                return None;
+            }
+
+            alternative = Some(self.parse_block_statement());
+        }
+
+        return Some(Expression::If(Box::new(IfExpression {
+            token: cur_token,
+            condition: Box::new(condition),
+            consequence,
+            alternative,
+        })));
+    }
+
+    fn parse_block_statement(&mut self) -> BlockStatement {
+        let cur_token = mem::take(&mut self.cur_token);
+        self.next_token();
+        let mut stmts = vec![];
+        while !self.cur_token_is(TokenType::Rbrace) && !self.cur_token_is(TokenType::Eof) {
+            let stmt = self.parse_statement();
+            if let Some(st) = stmt {
+                stmts.push(st);
+            }
+            self.next_token();
+        }
+
+        BlockStatement {
+            token: cur_token,
+            statements: stmts,
+        }
     }
 
     // helper functions
@@ -470,7 +539,7 @@ mod tests {
     #[test]
     fn test_parsing_prefix_expressions() {
         let prefix_tests: Vec<(&str, &str, Expected)> = vec![
-            ("!5;", "!", Expected::Int64(5)), 
+            ("!5;", "!", Expected::Int64(5)),
             ("-15;", "-", Expected::Int64(15)),
             ("!true;", "!", Expected::Boolean(true)),
             ("!false;", "!", Expected::Boolean(false)),
@@ -483,7 +552,10 @@ mod tests {
             check_parser_errors(&parser);
 
             test_statements_len(program.statements.len(), 1);
-            test_node_type(program.statements[0].node_type(), NodeType::ExpressionStatement);
+            test_node_type(
+                program.statements[0].node_type(),
+                NodeType::ExpressionStatement,
+            );
 
             if let Statement::Expression(expr_stmt) = &program.statements[0] {
                 test_node_type(expr_stmt.expression.node_type(), NodeType::PrefixExpression);
@@ -512,9 +584,24 @@ mod tests {
             ("5<5;", Expected::Int64(5), "<", Expected::Int64(5)),
             ("5==5;", Expected::Int64(5), "==", Expected::Int64(5)),
             ("5!=5;", Expected::Int64(5), "!=", Expected::Int64(5)),
-            ("true == true", Expected::Boolean(true), "==", Expected::Boolean(true)),
-            ("true != false", Expected::Boolean(true), "!=", Expected::Boolean(false)),
-            ("false == false", Expected::Boolean(false), "==", Expected::Boolean(false)),
+            (
+                "true == true",
+                Expected::Boolean(true),
+                "==",
+                Expected::Boolean(true),
+            ),
+            (
+                "true != false",
+                Expected::Boolean(true),
+                "!=",
+                Expected::Boolean(false),
+            ),
+            (
+                "false == false",
+                Expected::Boolean(false),
+                "==",
+                Expected::Boolean(false),
+            ),
         ];
 
         for (input, left_val, operator, right_val) in infix_tests {
@@ -555,6 +642,11 @@ mod tests {
             ("false", "false"),
             ("3 > 5 == false", "((3 > 5) == false)"),
             ("3 < 5 == true", "((3 < 5) == true)"),
+            ("1 + (2 + 3) + 4", "((1 + (2 + 3)) + 4)"),
+            ("(5 + 5) * 2", "((5 + 5) * 2)"),
+            ("2 / (5 + 5)", "(2 / (5 + 5))"),
+            ("-(5 + 5)", "(-(5 + 5))"),
+            ("!(true == true)", "(!(true == true))"),
         ];
 
         for (input, expected) in tests {
@@ -565,6 +657,104 @@ mod tests {
 
             let actual = program.to_string();
             assert_eq!(actual, expected, "expected={}, got={}", expected, actual);
+        }
+    }
+
+    #[test]
+    fn test_if_expression() {
+        let input = "if (x < y) { x }";
+        let lexer = Lexer::new(input.to_string());
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse_program();
+        check_parser_errors(&parser);
+
+        test_statements_len(program.statements.len(), 1);
+        test_node_type(
+            program.statements[0].node_type(),
+            NodeType::ExpressionStatement,
+        );
+        if let Statement::Expression(expr_stmt) = &program.statements[0] {
+            test_node_type(expr_stmt.expression.node_type(), NodeType::IfExpression);
+
+            if let Expression::If(if_expr) = &expr_stmt.expression {
+                test_infix_expression(
+                    &if_expr.condition,
+                    Expected::Str("x".to_string()),
+                    "<",
+                    Expected::Str("y".to_string()),
+                );
+
+                test_statements_len(if_expr.consequence.statements.len(), 1);
+                test_node_type(
+                    if_expr.consequence.statements[0].node_type(),
+                    NodeType::ExpressionStatement,
+                );
+
+                if let Statement::Expression(consq) = &if_expr.consequence.statements[0] {
+                    test_node_type(consq.expression.node_type(), NodeType::Identifier);
+                    test_identifier(&consq.expression, "x");
+                }
+
+                assert!(
+                    if_expr.alternative.is_none(),
+                    "if_expr.alternative was not None. got={}",
+                    if_expr.alternative.as_ref().unwrap()
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_if_else_expression() {
+        let input = "if (x < y) { x } else { y }";
+        let lexer = Lexer::new(input.to_string());
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse_program();
+        check_parser_errors(&parser);
+
+        test_statements_len(program.statements.len(), 1);
+        test_node_type(
+            program.statements[0].node_type(),
+            NodeType::ExpressionStatement,
+        );
+        if let Statement::Expression(expr_stmt) = &program.statements[0] {
+            test_node_type(expr_stmt.expression.node_type(), NodeType::IfExpression);
+
+            if let Expression::If(if_expr) = &expr_stmt.expression {
+                test_infix_expression(
+                    &if_expr.condition,
+                    Expected::Str("x".to_string()),
+                    "<",
+                    Expected::Str("y".to_string()),
+                );
+
+                test_statements_len(if_expr.consequence.statements.len(), 1);
+                test_node_type(
+                    if_expr.consequence.statements[0].node_type(),
+                    NodeType::ExpressionStatement,
+                );
+
+                if let Statement::Expression(consq) = &if_expr.consequence.statements[0] {
+                    test_node_type(consq.expression.node_type(), NodeType::Identifier);
+                    test_identifier(&consq.expression, "x");
+                }
+
+                assert!(
+                    if_expr.alternative.is_some(),
+                    "if_expr.alternative is not Some. got=None"
+                );
+                let alternative = if_expr.alternative.as_ref().unwrap();
+                test_statements_len(alternative.statements.len(), 1);
+                test_node_type(
+                    alternative.statements[0].node_type(),
+                    NodeType::ExpressionStatement,
+                );
+
+                if let Statement::Expression(alt) = &alternative.statements[0] {
+                    test_node_type(alt.expression.node_type(), NodeType::Identifier);
+                    test_identifier(&alt.expression, "y");
+                }
+            }
         }
     }
 
@@ -610,11 +800,7 @@ mod tests {
         test_node_type(bol_exp.node_type(), NodeType::BooleanLiteral);
 
         if let Expression::Boolean(bol) = bol_exp {
-            assert_eq!(
-                bol.value, val,
-                "bol.value not {}. got={}",
-                val, bol.value
-            );
+            assert_eq!(bol.value, val, "bol.value not {}. got={}", val, bol.value);
 
             assert_eq!(
                 bol.token_literal(),
@@ -626,27 +812,41 @@ mod tests {
         }
     }
 
-    fn test_identifier(exp: &Expression, val :&str) {
+    fn test_identifier(exp: &Expression, val: &str) {
         test_node_type(exp.node_type(), NodeType::Identifier);
         if let Expression::Ident(ident) = exp {
-            assert_eq!(ident.value, val, "ident.value not {}. got={}", val, ident.value);
-            assert_eq!(ident.token_literal(), val, "ident.token_literal() not {}. got={}", val, ident.token_literal());
+            assert_eq!(
+                ident.value, val,
+                "ident.value not {}. got={}",
+                val, ident.value
+            );
+            assert_eq!(
+                ident.token_literal(),
+                val,
+                "ident.token_literal() not {}. got={}",
+                val,
+                ident.token_literal()
+            );
         }
     }
 
     fn test_literal_expression(exp: &Expression, expected: Expected) {
-       match expected {
+        match expected {
             Expected::Int64(val) => test_integer_literal(exp, val),
             Expected::Str(val) => test_identifier(exp, &val),
             Expected::Boolean(val) => test_boolean_literal(exp, val),
-        } 
+        }
     }
 
-    fn test_infix_expression(exp: &Expression, left :Expected, op: &str, right: Expected) {
+    fn test_infix_expression(exp: &Expression, left: Expected, op: &str, right: Expected) {
         test_node_type(exp.node_type(), NodeType::InfixExpression);
         if let Expression::Infix(expr) = exp {
             test_literal_expression(&expr.left, left);
-            assert_eq!(expr.operator, op, "exp.operatir is not {}. got={}", op, expr.operator);
+            assert_eq!(
+                expr.operator, op,
+                "exp.operatir is not {}. got={}",
+                op, expr.operator
+            );
             test_literal_expression(&expr.right, right);
         }
     }
