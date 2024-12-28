@@ -21,6 +21,7 @@ pub enum NodeType {
     IfExpression,
     BlockStatement,
     FunctionLiteral,
+    CallExpression,
 }
 
 impl fmt::Display for NodeType {
@@ -38,6 +39,7 @@ impl fmt::Display for NodeType {
             NodeType::IfExpression => "if",
             NodeType::BlockStatement => "block_statement",
             NodeType::FunctionLiteral => "function_literal",
+            NodeType::CallExpression => "function_call",
         };
 
         write!(f, "{}", val)
@@ -90,6 +92,7 @@ pub enum Expression {
     Boolean(BooleanLiteral),
     If(Box<IfExpression>),
     Func(FunctionLiteral),
+    Call(Box<CallExpression>),
 }
 
 impl Node for Expression {
@@ -102,6 +105,7 @@ impl Node for Expression {
             Expression::Boolean(bol_lit) => bol_lit.token_literal(),
             Expression::If(if_exp) => if_exp.token_literal(),
             Expression::Func(func) => func.token_literal(),
+            Expression::Call(call) => call.token_literal(),
         }
     }
 
@@ -114,6 +118,7 @@ impl Node for Expression {
             Expression::Boolean(bol_lit) => bol_lit.node_type(),
             Expression::If(if_exp) => if_exp.node_type(),
             Expression::Func(func) => func.node_type(),
+            Expression::Call(call) => call.node_type(),
         }
     }
 }
@@ -128,6 +133,7 @@ impl fmt::Display for Expression {
             Expression::Boolean(bol_lit) => write!(f, "{}", bol_lit),
             Expression::If(if_exp) => write!(f, "{}", if_exp),
             Expression::Func(func) => write!(f, "{}", func),
+            Expression::Call(call) => write!(f, "{}", call),
         }
     }
 }
@@ -419,7 +425,40 @@ impl Node for FunctionLiteral {
 
 impl fmt::Display for FunctionLiteral {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let params = self.parameters.iter().map(|p| p.to_string()).collect::<Vec<String>>().join(",");
+        let params = self
+            .parameters
+            .iter()
+            .map(|p| p.to_string())
+            .collect::<Vec<String>>()
+            .join(", ");
         write!(f, "{}({}) {}", self.token_literal(), params, self.body)
+    }
+}
+
+pub struct CallExpression {
+    pub token: Token,              // the ( token
+    pub function: Box<Expression>, // identifier or function literal
+    pub arguments: Vec<Expression>,
+}
+
+impl Node for CallExpression {
+    fn token_literal(&self) -> &str {
+        &self.token.literal
+    }
+
+    fn node_type(&self) -> NodeType {
+        NodeType::CallExpression
+    }
+}
+
+impl fmt::Display for CallExpression {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let args = self
+            .arguments
+            .iter()
+            .map(|arg| arg.to_string())
+            .collect::<Vec<String>>()
+            .join(", ");
+        write!(f, "{}({})", self.function, args)
     }
 }

@@ -41,6 +41,7 @@ impl Parser {
         precedence_map.insert(TokenType::Minus, Precedence::Sum);
         precedence_map.insert(TokenType::Slash, Precedence::Product);
         precedence_map.insert(TokenType::Asterisk, Precedence::Product);
+        precedence_map.insert(TokenType::Lparen, Precedence::Call);
 
         let mut prefix_parse_fns: HashMap<TokenType, PrefixParseFn> = HashMap::new();
         prefix_parse_fns.insert(TokenType::Ident, Parser::parse_identifier);
@@ -62,6 +63,7 @@ impl Parser {
         infix_parse_fns.insert(TokenType::NotEq, Parser::parse_infix_expression);
         infix_parse_fns.insert(TokenType::LessThan, Parser::parse_infix_expression);
         infix_parse_fns.insert(TokenType::GreaterThan, Parser::parse_infix_expression);
+        infix_parse_fns.insert(TokenType::Lparen, Parser::parse_call_expression);
 
         Parser {
             lexer,
@@ -328,7 +330,7 @@ impl Parser {
     }
 
     fn parse_function_parameters(&mut self) -> Option<Vec<Identifier>> {
-        let mut identifiers : Vec<Identifier> = vec![];
+        let mut identifiers: Vec<Identifier> = vec![];
 
         if self.peek_token_is(TokenType::Rparen) {
             self.next_token();
@@ -338,14 +340,20 @@ impl Parser {
         self.next_token();
 
         let literal = self.cur_token.literal.clone();
-        let ident = Identifier { token: mem::take(&mut self.cur_token), value: literal };
+        let ident = Identifier {
+            token: mem::take(&mut self.cur_token),
+            value: literal,
+        };
         identifiers.push(ident);
-        
+
         while self.peek_token_is(TokenType::Comma) {
             self.next_token();
             self.next_token();
             let literal = self.cur_token.literal.clone();
-            let ident = Identifier { token: mem::take(&mut self.cur_token), value: literal };
+            let ident = Identifier {
+                token: mem::take(&mut self.cur_token),
+                value: literal,
+            };
             identifiers.push(ident);
         }
 
@@ -354,6 +362,43 @@ impl Parser {
         }
 
         Some(identifiers)
+    }
+
+    fn parse_call_expression(&mut self, function: Expression) -> Option<Expression> {
+        let cur_token = mem::take(&mut self.cur_token);
+        let arguments = self.parse_call_arguments()?;
+
+        Some(Expression::Call(Box::new(CallExpression {
+            token: cur_token,
+            function: Box::new(function),
+            arguments,
+        })))
+    }
+
+    fn parse_call_arguments(&mut self) -> Option<Vec<Expression>> {
+        let mut args: Vec<Expression> = vec![];
+        if self.peek_token_is(TokenType::Rparen) {
+            self.next_token();
+            return Some(args);
+        }
+
+        self.next_token();
+        let arg = self.parse_expression(Precedence::Lowest)?;
+        args.push(arg);
+
+        while self.peek_token_is(TokenType::Comma) {
+            self.next_token();
+            self.next_token();
+
+            let arg = self.parse_expression(Precedence::Lowest)?;
+            args.push(arg);
+        }
+
+        if !self.expect_peek(TokenType::Rparen) {
+            return None;
+        }
+
+        Some(args)
     }
 
     // helper functions
@@ -696,6 +741,15 @@ mod tests {
             ("2 / (5 + 5)", "(2 / (5 + 5))"),
             ("-(5 + 5)", "(-(5 + 5))"),
             ("!(true == true)", "(!(true == true))"),
+            ("a + add(b * c) + d", "((a + add((b * c))) + d)"),
+            (
+                "add(a, b, 1, 2 * 3, 4 + 5, add(6, 7 * 8))",
+                "add(a, b, 1, (2 * 3), (4 + 5), add(6, (7 * 8)))",
+            ),
+            (
+                "add(a + b + c * d / f + g)",
+                "add((((a + b) + ((c * d) / f)) + g))",
+            ),
         ];
 
         for (input, expected) in tests {
@@ -816,7 +870,10 @@ mod tests {
         check_parser_errors(&parser);
 
         test_statements_len(program.statements.len(), 1);
-        test_node_type(program.statements[0].node_type(), NodeType::ExpressionStatement);
+        test_node_type(
+            program.statements[0].node_type(),
+            NodeType::ExpressionStatement,
+        );
 
         if let Statement::Expression(stmt) = &program.statements[0] {
             test_node_type(stmt.expression.node_type(), NodeType::FunctionLiteral);
@@ -826,13 +883,59 @@ mod tests {
 
                 assert_eq!(func.parameters[0].token_literal(), "x");
                 assert_eq!(func.parameters[1].token_literal(), "y");
-                
+
                 test_statements_len(func.body.statements.len(), 1);
-                test_node_type(func.body.statements[0].node_type(), NodeType::ExpressionStatement);
+                test_node_type(
+                    func.body.statements[0].node_type(),
+                    NodeType::ExpressionStatement,
+                );
 
                 if let Statement::Expression(expr) = &func.body.statements[0] {
-                    test_infix_expression(&expr.expression, Expected::Str("x".to_string()), "+", Expected::Str("y".to_string()));
+                    test_infix_expression(
+                        &expr.expression,
+                        Expected::Str("x".to_string()),
+                        "+",
+                        Expected::Str("y".to_string()),
+                    );
                 }
+            }
+        }
+    }
+
+    #[test]
+    fn test_call_expression_parsing() {
+        let input = "add(1, 2 * 3, 4 + 5);";
+        let lexer = Lexer::new(input.to_string());
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse_program();
+        check_parser_errors(&parser);
+
+        test_statements_len(program.statements.len(), 1);
+        test_node_type(
+            program.statements[0].node_type(),
+            NodeType::ExpressionStatement,
+        );
+
+        if let Statement::Expression(stmt) = &program.statements[0] {
+            test_node_type(stmt.expression.node_type(), NodeType::CallExpression);
+
+            if let Expression::Call(call) = &stmt.expression {
+                test_identifier(&call.function, "add");
+
+                test_statements_len(call.arguments.len(), 3);
+                test_literal_expression(&call.arguments[0], Expected::Int64(1));
+                test_infix_expression(
+                    &call.arguments[1],
+                    Expected::Int64(2),
+                    "*",
+                    Expected::Int64(3),
+                );
+                test_infix_expression(
+                    &call.arguments[2],
+                    Expected::Int64(4),
+                    "+",
+                    Expected::Int64(5),
+                );
             }
         }
     }
