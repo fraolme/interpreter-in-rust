@@ -17,6 +17,7 @@ pub enum NodeType {
     IntegerLiteral,
     PrefixExpression,
     InfixExpression,
+    BooleanLiteral,
 }
 
 impl fmt::Display for NodeType {
@@ -30,6 +31,7 @@ impl fmt::Display for NodeType {
             NodeType::IntegerLiteral => "integer",
             NodeType::PrefixExpression => "prefix",
             NodeType::InfixExpression => "infix",
+            NodeType::BooleanLiteral => "boolean",
         };
 
         write!(f, "{}", val)
@@ -75,6 +77,7 @@ pub enum Expression {
     Int(IntegerLiteral),
     Prefix(Box<PrefixExpression>),
     Infix(Box<InfixExpression>),
+    Boolean(BooleanLiteral),
 }
 
 impl Node for Expression {
@@ -84,6 +87,7 @@ impl Node for Expression {
             Expression::Int(int_literal) => int_literal.token_literal(),
             Expression::Prefix(prefix) => prefix.token_literal(),
             Expression::Infix(infix) => infix.token_literal(),
+            Expression::Boolean(bol_lit) => bol_lit.token_literal(),
         }
     }
 
@@ -93,6 +97,7 @@ impl Node for Expression {
             Expression::Int(int_literal) => int_literal.node_type(),
             Expression::Prefix(prefix) => prefix.node_type(),
             Expression::Infix(infix) => infix.node_type(),
+            Expression::Boolean(bol_lit) => bol_lit.node_type(),
         }
     }
 }
@@ -104,6 +109,7 @@ impl fmt::Display for Expression {
             Expression::Int(int_literal) => write!(f, "{}", int_literal),
             Expression::Prefix(prefix) => write!(f, "{}", prefix),
             Expression::Infix(infix) => write!(f, "{}", infix),
+            Expression::Boolean(bol_lit) => write!(f, "{}", bol_lit),
         }
     }
 }
@@ -298,5 +304,26 @@ impl Node for InfixExpression {
 impl fmt::Display for InfixExpression {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "({} {} {})", self.left, self.operator, self.right)
+    }
+}
+
+pub struct BooleanLiteral {
+    pub token: Token,
+    pub value: bool,
+}
+
+impl Node for BooleanLiteral {
+    fn token_literal(&self) -> &str {
+        &self.token.literal
+    }
+
+    fn node_type(&self) -> NodeType {
+        NodeType::BooleanLiteral
+    }
+}
+
+impl fmt::Display for BooleanLiteral {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.value)
     }
 }

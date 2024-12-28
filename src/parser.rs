@@ -47,6 +47,8 @@ impl Parser {
         prefix_parse_fns.insert(TokenType::Int, Parser::parse_integer_literal);
         prefix_parse_fns.insert(TokenType::Bang, Parser::parse_prefix_expression);
         prefix_parse_fns.insert(TokenType::Minus, Parser::parse_prefix_expression);
+        prefix_parse_fns.insert(TokenType::True, Parser::parse_boolean);
+        prefix_parse_fns.insert(TokenType::False, Parser::parse_boolean);
 
         let mut infix_parse_fns: HashMap<TokenType, InfixParseFn> = HashMap::new();
         infix_parse_fns.insert(TokenType::Plus, Parser::parse_infix_expression);
@@ -200,6 +202,14 @@ impl Parser {
         }))
     }
 
+    fn parse_boolean(&mut self) -> Option<Expression> {
+        let val = self.cur_token_is(TokenType::True);
+        Some(Expression::Boolean(BooleanLiteral {
+            token: mem::take(&mut self.cur_token),
+            value: val,
+        }))
+    }
+
     fn parse_prefix_expression(&mut self) -> Option<Expression> {
         let operator = self.cur_token.literal.to_string();
         let cur_token = mem::take(&mut self.cur_token);
@@ -276,6 +286,12 @@ impl Parser {
 mod tests {
 
     use super::*;
+
+    enum Expected {
+        Int64(i64),
+        Str(String),
+        Boolean(bool),
+    }
 
     #[test]
     fn test_let_statements() {
@@ -453,36 +469,24 @@ mod tests {
 
     #[test]
     fn test_parsing_prefix_expressions() {
-        let prefix_tests: [(&str, &str, i64); 2] = [("!5;", "!", 5), ("-15;", "-", 15)];
+        let prefix_tests: Vec<(&str, &str, Expected)> = vec![
+            ("!5;", "!", Expected::Int64(5)), 
+            ("-15;", "-", Expected::Int64(15)),
+            ("!true;", "!", Expected::Boolean(true)),
+            ("!false;", "!", Expected::Boolean(false)),
+        ];
 
-        for (input, operator, int_val) in prefix_tests {
+        for (input, operator, expected) in prefix_tests {
             let lexer = Lexer::new(input.to_string());
             let mut parser = Parser::new(lexer);
             let program = parser.parse_program();
             check_parser_errors(&parser);
 
-            assert_eq!(
-                program.statements.len(),
-                1,
-                "program.statements does not contain {} statements. got={}",
-                1,
-                program.statements.len()
-            );
-
-            assert_eq!(
-                program.statements[0].node_type(),
-                NodeType::ExpressionStatement,
-                "program.statements[0] is not ast::ExpressionStatement. got={}",
-                program.statements[0].node_type()
-            );
+            test_statements_len(program.statements.len(), 1);
+            test_node_type(program.statements[0].node_type(), NodeType::ExpressionStatement);
 
             if let Statement::Expression(expr_stmt) = &program.statements[0] {
-                assert_eq!(
-                    expr_stmt.expression.node_type(),
-                    NodeType::PrefixExpression,
-                    "stmt is not ast::PrefixExpression. got={}",
-                    expr_stmt.expression.node_type()
-                );
+                test_node_type(expr_stmt.expression.node_type(), NodeType::PrefixExpression);
 
                 if let Expression::Prefix(exp) = &expr_stmt.expression {
                     assert_eq!(
@@ -491,7 +495,7 @@ mod tests {
                         operator, exp.operator
                     );
 
-                    test_integer_literal(exp.right.as_ref(), int_val);
+                    test_literal_expression(exp.right.as_ref(), expected);
                 }
             }
         }
@@ -499,15 +503,18 @@ mod tests {
 
     #[test]
     fn test_parsing_infix_expressions() {
-        let infix_tests: Vec<(&str, i64, &str, i64)> = vec![
-            ("5+5;", 5, "+", 5),
-            ("5-5;", 5, "-", 5),
-            ("5*5;", 5, "*", 5),
-            ("5/5;", 5, "/", 5),
-            ("5>5;", 5, ">", 5),
-            ("5<5;", 5, "<", 5),
-            ("5==5;", 5, "==", 5),
-            ("5!=5;", 5, "!=", 5),
+        let infix_tests: Vec<(&str, Expected, &str, Expected)> = vec![
+            ("5+5;", Expected::Int64(5), "+", Expected::Int64(5)),
+            ("5-5;", Expected::Int64(5), "-", Expected::Int64(5)),
+            ("5*5;", Expected::Int64(5), "*", Expected::Int64(5)),
+            ("5/5;", Expected::Int64(5), "/", Expected::Int64(5)),
+            ("5>5;", Expected::Int64(5), ">", Expected::Int64(5)),
+            ("5<5;", Expected::Int64(5), "<", Expected::Int64(5)),
+            ("5==5;", Expected::Int64(5), "==", Expected::Int64(5)),
+            ("5!=5;", Expected::Int64(5), "!=", Expected::Int64(5)),
+            ("true == true", Expected::Boolean(true), "==", Expected::Boolean(true)),
+            ("true != false", Expected::Boolean(true), "!=", Expected::Boolean(false)),
+            ("false == false", Expected::Boolean(false), "==", Expected::Boolean(false)),
         ];
 
         for (input, left_val, operator, right_val) in infix_tests {
@@ -522,18 +529,8 @@ mod tests {
                 NodeType::ExpressionStatement,
             );
 
-            if let Statement::Expression(expr) = &program.statements[0] {
-                test_node_type(expr.expression.node_type(), NodeType::InfixExpression);
-
-                if let Expression::Infix(infix) = &expr.expression {
-                    test_integer_literal(infix.left.as_ref(), left_val);
-                    assert_eq!(
-                        infix.operator, operator,
-                        "exp.operator is not {}. got={}",
-                        operator, infix.operator
-                    );
-                    test_integer_literal(infix.right.as_ref(), left_val);
-                }
+            if let Statement::Expression(expr_stmt) = &program.statements[0] {
+                test_infix_expression(&expr_stmt.expression, left_val, operator, right_val);
             }
         }
     }
@@ -554,6 +551,10 @@ mod tests {
                 "3 + 4 * 5 == 3 * 1 + 4 * 5",
                 "((3 + (4 * 5)) == ((3 * 1) + (4 * 5)))",
             ),
+            ("true", "true"),
+            ("false", "false"),
+            ("3 > 5 == false", "((3 > 5) == false)"),
+            ("3 < 5 == true", "((3 < 5) == true)"),
         ];
 
         for (input, expected) in tests {
@@ -586,14 +587,9 @@ mod tests {
     }
 
     fn test_integer_literal(int_exp: &Expression, val: i64) {
-        assert_eq!(
-            int_exp.node_type(),
-            NodeType::IntegerLiteral,
-            "il not ast::IntegerLiteral. got={}",
-            int_exp
-        );
+        test_node_type(int_exp.node_type(), NodeType::IntegerLiteral);
 
-        if let Expression::Int(integ) = &int_exp {
+        if let Expression::Int(integ) = int_exp {
             assert_eq!(
                 integ.value, val,
                 "integ.value not {}. got={}",
@@ -607,6 +603,51 @@ mod tests {
                 val,
                 integ.token_literal()
             );
+        }
+    }
+
+    fn test_boolean_literal(bol_exp: &Expression, val: bool) {
+        test_node_type(bol_exp.node_type(), NodeType::BooleanLiteral);
+
+        if let Expression::Boolean(bol) = bol_exp {
+            assert_eq!(
+                bol.value, val,
+                "bol.value not {}. got={}",
+                val, bol.value
+            );
+
+            assert_eq!(
+                bol.token_literal(),
+                val.to_string(),
+                "bol.token_literal() not {}. got={}",
+                val,
+                bol.token_literal()
+            );
+        }
+    }
+
+    fn test_identifier(exp: &Expression, val :&str) {
+        test_node_type(exp.node_type(), NodeType::Identifier);
+        if let Expression::Ident(ident) = exp {
+            assert_eq!(ident.value, val, "ident.value not {}. got={}", val, ident.value);
+            assert_eq!(ident.token_literal(), val, "ident.token_literal() not {}. got={}", val, ident.token_literal());
+        }
+    }
+
+    fn test_literal_expression(exp: &Expression, expected: Expected) {
+       match expected {
+            Expected::Int64(val) => test_integer_literal(exp, val),
+            Expected::Str(val) => test_identifier(exp, &val),
+            Expected::Boolean(val) => test_boolean_literal(exp, val),
+        } 
+    }
+
+    fn test_infix_expression(exp: &Expression, left :Expected, op: &str, right: Expected) {
+        test_node_type(exp.node_type(), NodeType::InfixExpression);
+        if let Expression::Infix(expr) = exp {
+            test_literal_expression(&expr.left, left);
+            assert_eq!(expr.operator, op, "exp.operatir is not {}. got={}", op, expr.operator);
+            test_literal_expression(&expr.right, right);
         }
     }
 
