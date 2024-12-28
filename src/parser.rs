@@ -51,6 +51,7 @@ impl Parser {
         prefix_parse_fns.insert(TokenType::False, Parser::parse_boolean);
         prefix_parse_fns.insert(TokenType::Lparen, Parser::parse_grouped_expression);
         prefix_parse_fns.insert(TokenType::If, Parser::parse_if_expression);
+        prefix_parse_fns.insert(TokenType::Function, Parser::parse_function_literal);
 
         let mut infix_parse_fns: HashMap<TokenType, InfixParseFn> = HashMap::new();
         infix_parse_fns.insert(TokenType::Plus, Parser::parse_infix_expression);
@@ -305,6 +306,54 @@ impl Parser {
             token: cur_token,
             statements: stmts,
         }
+    }
+
+    fn parse_function_literal(&mut self) -> Option<Expression> {
+        let cur_token = mem::take(&mut self.cur_token);
+        if !self.expect_peek(TokenType::Lparen) {
+            return None;
+        }
+        let params = self.parse_function_parameters()?;
+        if !self.expect_peek(TokenType::Lbrace) {
+            return None;
+        }
+
+        let body = self.parse_block_statement();
+
+        Some(Expression::Func(FunctionLiteral {
+            token: cur_token,
+            parameters: params,
+            body,
+        }))
+    }
+
+    fn parse_function_parameters(&mut self) -> Option<Vec<Identifier>> {
+        let mut identifiers : Vec<Identifier> = vec![];
+
+        if self.peek_token_is(TokenType::Rparen) {
+            self.next_token();
+            return Some(identifiers);
+        }
+
+        self.next_token();
+
+        let literal = self.cur_token.literal.clone();
+        let ident = Identifier { token: mem::take(&mut self.cur_token), value: literal };
+        identifiers.push(ident);
+        
+        while self.peek_token_is(TokenType::Comma) {
+            self.next_token();
+            self.next_token();
+            let literal = self.cur_token.literal.clone();
+            let ident = Identifier { token: mem::take(&mut self.cur_token), value: literal };
+            identifiers.push(ident);
+        }
+
+        if !self.expect_peek(TokenType::Rparen) {
+            return None;
+        }
+
+        Some(identifiers)
     }
 
     // helper functions
@@ -753,6 +802,36 @@ mod tests {
                 if let Statement::Expression(alt) = &alternative.statements[0] {
                     test_node_type(alt.expression.node_type(), NodeType::Identifier);
                     test_identifier(&alt.expression, "y");
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_function_literal_parsing() {
+        let input = "fn(x, y) { x + y; }";
+        let lexer = Lexer::new(input.to_string());
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse_program();
+        check_parser_errors(&parser);
+
+        test_statements_len(program.statements.len(), 1);
+        test_node_type(program.statements[0].node_type(), NodeType::ExpressionStatement);
+
+        if let Statement::Expression(stmt) = &program.statements[0] {
+            test_node_type(stmt.expression.node_type(), NodeType::FunctionLiteral);
+
+            if let Expression::Func(func) = &stmt.expression {
+                test_statements_len(func.parameters.len(), 2);
+
+                assert_eq!(func.parameters[0].token_literal(), "x");
+                assert_eq!(func.parameters[1].token_literal(), "y");
+                
+                test_statements_len(func.body.statements.len(), 1);
+                test_node_type(func.body.statements[0].node_type(), NodeType::ExpressionStatement);
+
+                if let Statement::Expression(expr) = &func.body.statements[0] {
+                    test_infix_expression(&expr.expression, Expected::Str("x".to_string()), "+", Expected::Str("y".to_string()));
                 }
             }
         }
