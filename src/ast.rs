@@ -170,8 +170,7 @@ impl fmt::Display for Program {
 pub struct LetStatement {
     pub token: Token,
     pub name: Identifier,
-    //TODO: skip expressions for now
-    //value: Expression,
+    pub value: Expression,
 }
 
 impl Node for LetStatement {
@@ -189,8 +188,7 @@ impl fmt::Display for LetStatement {
         let mut buffer = String::new();
         write!(&mut buffer, "{} ", self.token_literal()).unwrap();
         write!(&mut buffer, "{} = ", self.name).unwrap();
-        //TODO: add the value part
-        //write!(&mut buffer, "{};", self.value);
+        write!(&mut buffer, "{};", self.value);
 
         write!(f, "{}", buffer)
     }
@@ -219,8 +217,7 @@ impl fmt::Display for Identifier {
 
 pub struct ReturnStatement {
     pub token: Token,
-    //TODO: parse the expression part later
-    //pub return_value: Expression,
+    pub return_value: Expression,
 }
 
 impl Node for ReturnStatement {
@@ -237,8 +234,7 @@ impl fmt::Display for ReturnStatement {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let mut buffer = String::new();
         write!(&mut buffer, "{} ", self.token_literal()).unwrap();
-        //TODO: add the return_value part
-        //write!(&mut buffer, "{};", self.name).unwrap();
+        write!(&mut buffer, "{};", self.return_value).unwrap();
         write!(f, "{}", buffer)
     }
 }

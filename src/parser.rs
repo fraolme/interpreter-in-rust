@@ -120,14 +120,18 @@ impl Parser {
             return None;
         }
 
-        //TODO: parse the expression part, for now skip it
-        while !self.cur_token_is(TokenType::SemiColon) {
+        self.next_token();
+
+        let value = self.parse_expression(Precedence::Lowest)?;
+
+        if self.peek_token_is(TokenType::SemiColon) {
             self.next_token();
         }
 
         Some(Statement::Let(LetStatement {
             token: let_token,
             name: identifier,
+            value
         }))
     }
 
@@ -136,16 +140,18 @@ impl Parser {
 
         self.next_token();
 
-        //TODO: parse the expression part
+        let return_value = self.parse_expression(Precedence::Lowest)?;
 
-        while !self.cur_token_is(TokenType::SemiColon) {
+        if self.peek_token_is(TokenType::SemiColon) {
             self.next_token();
         }
 
         Some(Statement::Return(ReturnStatement {
             token: return_token,
+            return_value,
         }))
     }
+
 
     fn parse_expression_statement(&mut self) -> Option<Statement> {
         let cur_token = self.cur_token.clone();
@@ -458,83 +464,44 @@ mod tests {
 
     #[test]
     fn test_let_statements() {
-        let input = r#"
-            let x = 5;
-            let y = 10;
-            let foobar = 838383;
-        "#;
+        let tests : Vec<(&str, &str, Expected)>= vec![
+            ("let x = 5;", "x", Expected::Int64(5)),
+            ("let y = true;", "y", Expected::Boolean(true)),
+            ("let foobar = y;", "foobar", Expected::Str("y".to_string())),
+        ];
 
-        let lexer = Lexer::new(String::from(input));
-        let mut parser = Parser::new(lexer);
-        let program = parser.parse_program();
-        check_parser_errors(&parser);
+        for (input, expected_ident, expected_val) in tests {
 
-        let statements_count = program.statements.len();
-        assert_eq!(
-            statements_count, 3,
-            "program.Statements does not contain 3 statements. got={statements_count}"
-        );
+            let lexer = Lexer::new(String::from(input));
+            let mut parser = Parser::new(lexer);
+            let program = parser.parse_program();
+            check_parser_errors(&parser);
 
-        let tests = ["x", "y", "foobar"];
-        for (index, expected_identifier) in tests.iter().enumerate() {
-            let stmt = &program.statements[index];
-            let token_literal = stmt.token_literal();
-            let node_type = stmt.node_type();
-            assert_eq!(
-                token_literal, "let",
-                "stmt.token_literal is not 'let'. got = {token_literal}"
-            );
-
-            assert_eq!(
-                node_type,
-                NodeType::Let,
-                "stmt is not ast::LetStatement. got = {node_type}"
-            );
-
-            if let Statement::Let(let_statement) = stmt {
-                let ident_val = &let_statement.name.value;
-                let ident_literal = &let_statement.name.token_literal();
-                assert_eq!(
-                    ident_val, expected_identifier,
-                    "let_statment.name.value not {expected_identifier}. got={ident_val}"
-                );
-
-                assert_eq!(ident_literal, expected_identifier, "let_statement.name.token_literal() not {expected_identifier}. got={ident_literal}");
-            }
+            test_statements_len(program.statements.len(), 1);
+            test_let_statement(&program.statements[0], expected_ident, expected_val);
         }
+
     }
 
     #[test]
     fn test_return_statements() {
-        let input = r#"
-            return 5;
-            return 10;
-            return 993322;
-        "#;
-        let lexer = Lexer::new(String::from(input));
-        let mut parser = Parser::new(lexer);
-        let program = parser.parse_program();
-        check_parser_errors(&parser);
+        
+        let tests : Vec<(&str, Expected)>= vec![
+            ("return 5;", Expected::Int64(5)),
+            ("return true;", Expected::Boolean(true)),
+            ("return y;", Expected::Str("y".to_string())),
+        ];
 
-        let statements_count = program.statements.len();
-        assert_eq!(
-            statements_count, 3,
-            "program.Statements does not contain 3 statements. got={statements_count}"
-        );
+        for (input, expected_val) in tests {
+            let lexer = Lexer::new(String::from(input));
+            let mut parser = Parser::new(lexer);
+            let program = parser.parse_program();
+            check_parser_errors(&parser);
 
-        for stmt in program.statements {
-            let node_type = stmt.node_type();
-            assert_eq!(
-                node_type,
-                NodeType::Return,
-                "stmt not ast.ReturnStatement. got={node_type}"
-            );
-            if let Statement::Return(return_statement) = stmt {
-                let return_token_literal = return_statement.token_literal();
-                assert_eq!(
-                    return_token_literal, "return",
-                    "return_statement.token_literal not 'return', got {return_token_literal}"
-                );
+            test_statements_len(program.statements.len(), 1);
+            test_node_type(program.statements[0].node_type(), NodeType::Return);
+            if let Statement::Return(ret_stmt) = &program.statements[0] {
+                test_literal_expression(&ret_stmt.return_value, expected_val);
             }
         }
     }
@@ -1047,5 +1014,16 @@ mod tests {
             "node is not of type {}. got={}",
             expected_node_type, node_type
         );
+    }
+
+    fn test_let_statement(stmt : &Statement, name: &str, value: Expected) {
+        test_node_type(stmt.node_type(), NodeType::Let);
+        if let Statement::Let(let_stmt) = stmt {
+            assert_eq!(let_stmt.name.value, name, "let_stmt.name.value not {}. got={}", name, let_stmt.name.value);
+
+            assert_eq!(let_stmt.name.token_literal(), name, "let_stmt.name.token_literal() not {} got={}", name, let_stmt.name.token_literal());
+
+            test_literal_expression(&let_stmt.value, value);
+        }
     }
 }
