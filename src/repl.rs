@@ -1,5 +1,5 @@
 use crate::lexer::Lexer;
-use crate::token::TokenType;
+use crate::parser::Parser;
 use std::io::{stdout, Stdin, Write};
 
 const PROMPT: &str = ">> ";
@@ -14,11 +14,22 @@ pub fn start(stdin: Stdin) {
 
         stdin.read_line(&mut buffer).expect("Failed to read input");
 
-        let mut lexer = Lexer::new(buffer);
-        let mut tok = lexer.next_token();
-        while tok.token_type != TokenType::Eof {
-            println!("{:?}", tok);
-            tok = lexer.next_token();
+        let lexer = Lexer::new(buffer);
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse_program();
+        if parser.errors.len() != 0 {
+            println!(
+                "Whoops parser errors:\n {}",
+                parser
+                    .errors
+                    .iter()
+                    .map(|e| format!("\t{}", e))
+                    .collect::<Vec<String>>()
+                    .join("\n")
+            );
+            continue;
         }
+
+        println!("{}", program);
     }
 }

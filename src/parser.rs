@@ -21,14 +21,14 @@ pub struct Parser {
     lexer: Lexer,
     cur_token: Token,
     peek_token: Token,
-    errors: Vec<String>,
+    pub errors: Vec<String>,
     prefix_parse_fns: HashMap<TokenType, PrefixParseFn>,
     infix_parse_fns: HashMap<TokenType, InfixParseFn>,
     precedence_map: HashMap<TokenType, Precedence>,
 }
 
 impl Parser {
-    fn new(mut lexer: Lexer) -> Self {
+    pub fn new(mut lexer: Lexer) -> Self {
         let cur_token = lexer.next_token();
         let peek_token = lexer.next_token();
 
@@ -81,7 +81,7 @@ impl Parser {
         self.peek_token = self.lexer.next_token();
     }
 
-    fn parse_program(&mut self) -> Program {
+    pub fn parse_program(&mut self) -> Program {
         let mut program = Program { statements: vec![] };
         while self.cur_token.token_type != TokenType::Eof {
             if let Some(statement) = self.parse_statement() {
@@ -131,7 +131,7 @@ impl Parser {
         Some(Statement::Let(LetStatement {
             token: let_token,
             name: identifier,
-            value
+            value,
         }))
     }
 
@@ -151,7 +151,6 @@ impl Parser {
             return_value,
         }))
     }
-
 
     fn parse_expression_statement(&mut self) -> Option<Statement> {
         let cur_token = self.cur_token.clone();
@@ -464,14 +463,13 @@ mod tests {
 
     #[test]
     fn test_let_statements() {
-        let tests : Vec<(&str, &str, Expected)>= vec![
+        let tests: Vec<(&str, &str, Expected)> = vec![
             ("let x = 5;", "x", Expected::Int64(5)),
             ("let y = true;", "y", Expected::Boolean(true)),
             ("let foobar = y;", "foobar", Expected::Str("y".to_string())),
         ];
 
         for (input, expected_ident, expected_val) in tests {
-
             let lexer = Lexer::new(String::from(input));
             let mut parser = Parser::new(lexer);
             let program = parser.parse_program();
@@ -480,13 +478,11 @@ mod tests {
             test_statements_len(program.statements.len(), 1);
             test_let_statement(&program.statements[0], expected_ident, expected_val);
         }
-
     }
 
     #[test]
     fn test_return_statements() {
-        
-        let tests : Vec<(&str, Expected)>= vec![
+        let tests: Vec<(&str, Expected)> = vec![
             ("return 5;", Expected::Int64(5)),
             ("return true;", Expected::Boolean(true)),
             ("return y;", Expected::Str("y".to_string())),
@@ -1016,12 +1012,22 @@ mod tests {
         );
     }
 
-    fn test_let_statement(stmt : &Statement, name: &str, value: Expected) {
+    fn test_let_statement(stmt: &Statement, name: &str, value: Expected) {
         test_node_type(stmt.node_type(), NodeType::Let);
         if let Statement::Let(let_stmt) = stmt {
-            assert_eq!(let_stmt.name.value, name, "let_stmt.name.value not {}. got={}", name, let_stmt.name.value);
+            assert_eq!(
+                let_stmt.name.value, name,
+                "let_stmt.name.value not {}. got={}",
+                name, let_stmt.name.value
+            );
 
-            assert_eq!(let_stmt.name.token_literal(), name, "let_stmt.name.token_literal() not {} got={}", name, let_stmt.name.token_literal());
+            assert_eq!(
+                let_stmt.name.token_literal(),
+                name,
+                "let_stmt.name.token_literal() not {} got={}",
+                name,
+                let_stmt.name.token_literal()
+            );
 
             test_literal_expression(&let_stmt.value, value);
         }

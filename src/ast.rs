@@ -186,9 +186,9 @@ impl Node for LetStatement {
 impl fmt::Display for LetStatement {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let mut buffer = String::new();
-        write!(&mut buffer, "{} ", self.token_literal()).unwrap();
-        write!(&mut buffer, "{} = ", self.name).unwrap();
-        write!(&mut buffer, "{};", self.value);
+        write!(&mut buffer, "{} ", self.token_literal())?;
+        write!(&mut buffer, "{} = ", self.name)?;
+        write!(&mut buffer, "{};", self.value)?;
 
         write!(f, "{}", buffer)
     }
