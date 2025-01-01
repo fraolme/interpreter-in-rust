@@ -6,7 +6,7 @@ pub enum Object {
 }
 
 impl Object {
-    fn inspect(&self) -> String {
+    pub fn inspect(&self) -> String {
         match self {
             Object::Integer(val) => format!("{}", val),
             Object::Boolean(val) => format!("{}", val),

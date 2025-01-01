@@ -1,4 +1,6 @@
+use crate::evaluator::eval;
 use crate::lexer::Lexer;
+use crate::object::Object;
 use crate::parser::Parser;
 use std::io::{stdout, Stdin, Write};
 
@@ -30,6 +32,10 @@ pub fn start(stdin: Stdin) {
             continue;
         }
 
-        println!("{}", program);
+        let evaluated = eval(program);
+        match evaluated {
+            Object::Null => continue,
+            _ => println!("{}", evaluated.inspect()),
+        }
     }
 }
