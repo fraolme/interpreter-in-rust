@@ -6,13 +6,13 @@ pub fn eval(program: Program) -> Object {
     for statement in program.statements {
         result = eval_statement(statement);
     }
-
     result
 }
 
 fn eval_statement(stmt: Statement) -> Object {
     match stmt {
         Statement::Expression(expr_stmt) => eval_expression(expr_stmt.expression),
+        Statement::Block(block_stmt) => eval_block_statment(block_stmt),
         _ => panic!("Unsupported statement type"),
     }
 }
@@ -29,6 +29,22 @@ fn eval_expression(expr: Expression) -> Object {
             let left = eval_expression(*infix.left);
             let right = eval_expression(*infix.right);
             return eval_infix_expression(&infix.operator, left, right);
+        }
+        Expression::If(if_expr) => {
+            let condition = eval_expression(*if_expr.condition);
+            let cond_val = match condition {
+                Object::Boolean(bool_val) => bool_val,
+                Object::Null => false,
+                _ => true,
+            };
+
+            if cond_val {
+                return eval_statement(Statement::Block(if_expr.consequence));
+            } else if if_expr.alternative.is_some() {
+                return eval_statement(Statement::Block(if_expr.alternative.unwrap()));
+            } else {
+                return Object::Null;
+            }
         }
         _ => panic!("Unsupported expression type"),
     }
@@ -74,7 +90,7 @@ fn eval_infix_expression(operator: &str, left: Object, right: Object) -> Object 
         (Object::Null, Object::Null) => Object::Boolean(true),
         _ => {
             // different type return false for == and != while it returns null for other types
-            if (operator == "==" || operator == "!=") {
+            if operator == "==" || operator == "!=" {
                 Object::Boolean(false)
             } else {
                 Object::Null
@@ -105,11 +121,25 @@ fn eval_boolean_infix_expression(operator: &str, left_val: bool, right_val: bool
     }
 }
 
+fn eval_block_statment(block_statement: BlockStatement) -> Object {
+    let mut result = Object::Null;
+    for stmt in block_statement.statements {
+        result = eval_statement(stmt);
+    }
+    result
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
     use crate::lexer::Lexer;
     use crate::parser::Parser;
+
+    enum Expected {
+        Int64(i64),
+        Boolean(bool),
+        Null,
+    }
 
     #[test]
     fn test_eval_integer_expression() {
@@ -184,6 +214,28 @@ mod test {
         }
     }
 
+    #[test]
+    fn test_if_else_expressions() {
+        let tests: Vec<(&str, Expected)> = vec![
+            ("if (true) { 10 }", Expected::Int64(10)),
+            ("if (false) { 10 }", Expected::Null),
+            ("if (1) { 10 }", Expected::Int64(10)),
+            ("if (1 < 2) { 10 }", Expected::Int64(10)),
+            ("if (1 > 2) { 10 }", Expected::Null),
+            ("if (1 > 2) { 10 } else { 20 }", Expected::Int64(20)),
+            ("if (1 < 2) { 10 } else { 20 }", Expected::Int64(10)),
+        ];
+
+        for (input, expected) in tests {
+            let evaluated = test_eval(input);
+            match expected {
+                Expected::Int64(val) => test_integer_object(evaluated, val),
+                Expected::Null => test_null_object(evaluated),
+                _ => (),
+            }
+        }
+    }
+
     // helpers
     fn test_eval(input: &str) -> Object {
         let lexer = Lexer::new(input.to_string());
@@ -215,5 +267,9 @@ mod test {
         } else {
             panic!("object is not boolean. got={:?}", obj);
         }
+    }
+
+    fn test_null_object(obj: Object) {
+        assert_eq!(obj, Object::Null, "object is not null. got={:?}", obj);
     }
 }
