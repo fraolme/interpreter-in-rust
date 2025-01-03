@@ -3,8 +3,11 @@ use crate::object::Object;
 
 pub fn eval(program: Program) -> Object {
     let mut result = Object::Null;
-    for statement in program.statements {
-        result = eval_statement(statement);
+    for stmt in program.statements {
+        result = eval_statement(stmt);
+        if let Object::ReturnValue(obj) = result {
+            return *obj;
+        }
     }
     result
 }
@@ -12,7 +15,10 @@ pub fn eval(program: Program) -> Object {
 fn eval_statement(stmt: Statement) -> Object {
     match stmt {
         Statement::Expression(expr_stmt) => eval_expression(expr_stmt.expression),
-        Statement::Block(block_stmt) => eval_block_statment(block_stmt),
+        Statement::Block(block_stmt) => eval_block_statement(block_stmt),
+        Statement::Return(ret_stmt) => {
+            Object::ReturnValue(Box::new(eval_expression(ret_stmt.return_value)))
+        }
         _ => panic!("Unsupported statement type"),
     }
 }
@@ -60,13 +66,7 @@ fn eval_prefix_expression(operator: &str, right: Object) -> Object {
 
 fn eval_bang_operator_expression(right: Object) -> Object {
     match right {
-        Object::Boolean(val) => {
-            if val {
-                Object::Boolean(false)
-            } else {
-                Object::Boolean(true)
-            }
-        }
+        Object::Boolean(val) => Object::Boolean(!val),
         Object::Null => Object::Boolean(true),
         _ => Object::Boolean(false), // all other values are taken as true
     }
@@ -121,10 +121,14 @@ fn eval_boolean_infix_expression(operator: &str, left_val: bool, right_val: bool
     }
 }
 
-fn eval_block_statment(block_statement: BlockStatement) -> Object {
+fn eval_block_statement(block_statement: BlockStatement) -> Object {
     let mut result = Object::Null;
     for stmt in block_statement.statements {
         result = eval_statement(stmt);
+        // bubble it up without unwraping the return value to handle return inside nested if
+        if let Object::ReturnValue(_) = result {
+            return result;
+        }
     }
     result
 }
@@ -233,6 +237,33 @@ mod test {
                 Expected::Null => test_null_object(evaluated),
                 _ => (),
             }
+        }
+    }
+
+    #[test]
+    fn test_return_statements() {
+        let tests: Vec<(&str, i64)> = vec![
+            ("return 10;", 10),
+            ("return 10; 9;", 10),
+            ("return 2 * 5; 9", 10),
+            ("9; return 2 * 5; 9;", 10),
+            (
+                r#"
+                if (10 > 1) {
+                    if(10 > 1) {
+                        return 10;
+                    }
+                }
+
+                return 1;
+            "#,
+                10,
+            ),
+        ];
+
+        for (input, expected) in tests {
+            let evaluated = test_eval(input);
+            test_integer_object(evaluated, expected);
         }
     }
 
