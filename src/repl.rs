@@ -1,3 +1,4 @@
+use crate::environment::Environment;
 use crate::evaluator::eval;
 use crate::lexer::Lexer;
 use crate::object::Object;
@@ -7,6 +8,8 @@ use std::io::{stdout, Stdin, Write};
 const PROMPT: &str = ">> ";
 
 pub fn start(stdin: Stdin) {
+    let mut env = Environment::new();
+
     loop {
         let mut buffer = String::new();
 
@@ -32,7 +35,7 @@ pub fn start(stdin: Stdin) {
             continue;
         }
 
-        let evaluated = eval(program);
+        let evaluated = eval(program, &mut env);
         match evaluated {
             Object::Null => continue,
             _ => println!("{}", evaluated.inspect()),
