@@ -1,12 +1,15 @@
+use crate::ast::{BlockStatement, Identifier};
+use crate::environment::Environment;
 use std::fmt;
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Clone)]
 pub enum Object {
     Integer(i64),
     Boolean(bool),
     Null,
     ReturnValue(Box<Object>),
     Error(String),
+    Function(FunctionObject),
 }
 
 impl Object {
@@ -21,6 +24,7 @@ impl Object {
             Object::Null => "NULL",
             Object::ReturnValue(_) => "RETURN",
             Object::Error(_) => "ERROR",
+            Object::Function(_) => "FUNCTION",
         }
     }
 }
@@ -33,6 +37,29 @@ impl fmt::Display for Object {
             Object::Null => write!(f, "null"),
             Object::ReturnValue(obj) => write!(f, "{}", obj),
             Object::Error(message) => write!(f, "ERROR: {}", message),
+            Object::Function(func) => write!(f, "{}", func),
         }
+    }
+}
+
+#[derive(Clone)]
+pub struct FunctionObject {
+    pub parameters: Vec<Identifier>,
+    pub body: BlockStatement,
+    pub env: Environment,
+}
+
+impl fmt::Display for FunctionObject {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "fn ({}) {{\n {} \n}}",
+            self.parameters
+                .iter()
+                .map(|p| p.value.clone())
+                .collect::<Vec<String>>()
+                .join(", "),
+            self.body
+        )
     }
 }

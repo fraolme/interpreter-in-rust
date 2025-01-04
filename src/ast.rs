@@ -46,6 +46,7 @@ impl fmt::Display for NodeType {
     }
 }
 
+#[derive(Clone)]
 pub enum Statement {
     Let(LetStatement),
     Return(ReturnStatement),
@@ -84,6 +85,7 @@ impl fmt::Display for Statement {
     }
 }
 
+#[derive(Clone)]
 pub enum Expression {
     Ident(Identifier),
     Int(IntegerLiteral),
@@ -167,6 +169,7 @@ impl fmt::Display for Program {
     }
 }
 
+#[derive(Clone)]
 pub struct LetStatement {
     pub token: Token,
     pub name: Identifier,
@@ -194,6 +197,7 @@ impl fmt::Display for LetStatement {
     }
 }
 
+#[derive(Clone)]
 pub struct Identifier {
     pub token: Token,
     pub value: String,
@@ -215,6 +219,7 @@ impl fmt::Display for Identifier {
     }
 }
 
+#[derive(Clone)]
 pub struct ReturnStatement {
     pub token: Token,
     pub return_value: Expression,
@@ -240,6 +245,7 @@ impl fmt::Display for ReturnStatement {
 }
 
 // for this kind of statements -> x + 10;
+#[derive(Clone)]
 pub struct ExpressionStatement {
     pub token: Token,
     pub expression: Expression,
@@ -261,6 +267,7 @@ impl fmt::Display for ExpressionStatement {
     }
 }
 
+#[derive(Clone)]
 pub struct IntegerLiteral {
     pub token: Token,
     pub value: i64,
@@ -282,6 +289,7 @@ impl fmt::Display for IntegerLiteral {
     }
 }
 
+#[derive(Clone)]
 pub struct PrefixExpression {
     pub token: Token,
     pub operator: String,
@@ -304,6 +312,7 @@ impl fmt::Display for PrefixExpression {
     }
 }
 
+#[derive(Clone)]
 pub struct InfixExpression {
     pub token: Token,
     pub left: Box<Expression>,
@@ -327,6 +336,7 @@ impl fmt::Display for InfixExpression {
     }
 }
 
+#[derive(Clone)]
 pub struct BooleanLiteral {
     pub token: Token,
     pub value: bool,
@@ -348,6 +358,7 @@ impl fmt::Display for BooleanLiteral {
     }
 }
 
+#[derive(Clone)]
 pub struct IfExpression {
     pub token: Token, // if token
     pub condition: Box<Expression>,
@@ -377,6 +388,7 @@ impl fmt::Display for IfExpression {
     }
 }
 
+#[derive(Clone)]
 pub struct BlockStatement {
     pub token: Token, // { token
     pub statements: Vec<Statement>,
@@ -403,6 +415,7 @@ impl fmt::Display for BlockStatement {
     }
 }
 
+#[derive(Clone)]
 pub struct FunctionLiteral {
     pub token: Token, // fn token
     pub parameters: Vec<Identifier>,
@@ -431,6 +444,7 @@ impl fmt::Display for FunctionLiteral {
     }
 }
 
+#[derive(Clone)]
 pub struct CallExpression {
     pub token: Token,              // the ( token
     pub function: Box<Expression>, // identifier or function literal

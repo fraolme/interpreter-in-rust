@@ -1,6 +1,6 @@
 use crate::ast::*;
 use crate::environment::Environment;
-use crate::object::Object;
+use crate::object::{FunctionObject, Object};
 
 pub fn eval(program: Program, env: &mut Environment) -> Object {
     let mut result = Object::Null;
@@ -63,6 +63,11 @@ fn eval_expression(expr: Expression, env: &mut Environment) -> Object {
         }
         Expression::If(if_expr) => eval_if_expression(*if_expr, env),
         Expression::Ident(ident) => eval_identifier(ident, env),
+        Expression::Func(func_lit) => Object::Function(FunctionObject {
+            parameters: func_lit.parameters,
+            body: func_lit.body,
+            env: env.clone(),
+        }),
         _ => panic!("Unsupported expression type"),
     }
 }
@@ -362,7 +367,7 @@ mod test {
                     expected_msg, msg
                 );
             } else {
-                panic!("no error object returned. got={:?}", evaluated);
+                panic!("no error object returned. got={}", evaluated);
             }
         }
     }
@@ -378,6 +383,35 @@ mod test {
 
         for (input, expected) in tests {
             test_integer_object(test_eval(input), expected);
+        }
+    }
+
+    #[test]
+    fn test_function_object() {
+        let input = "fn(x) {x + 2;};";
+        let evaluated = test_eval(input);
+        if let Object::Function(func) = evaluated {
+            assert_eq!(
+                func.parameters.len(),
+                1,
+                "function has wrong parameters. parameters={}",
+                func.parameters.len()
+            );
+            assert_eq!(
+                func.parameters[0].to_string(),
+                "x",
+                "parameter is not 'x'. got={}",
+                func.parameters[0]
+            );
+            assert_eq!(
+                func.body.to_string(),
+                "(x + 2)",
+                "body is not {}. got={}",
+                "(x + 2)",
+                func.body
+            );
+        } else {
+            panic!("object is not Function. got={}", evaluated);
         }
     }
 
@@ -399,7 +433,7 @@ mod test {
                 val, expected
             );
         } else {
-            panic!("object is not integer. got={:?}", obj);
+            panic!("object is not integer. got={}", obj);
         }
     }
 
@@ -411,11 +445,14 @@ mod test {
                 val, expected
             );
         } else {
-            panic!("object is not boolean. got={:?}", obj);
+            panic!("object is not boolean. got={}", obj);
         }
     }
 
     fn test_null_object(obj: Object) {
-        assert_eq!(obj, Object::Null, "object is not null. got={:?}", obj);
+        if let Object::Null = obj {
+        } else {
+            panic!("object is not null. got={}", obj);
+        }
     }
 }
