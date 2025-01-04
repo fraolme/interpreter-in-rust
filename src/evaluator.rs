@@ -68,7 +68,21 @@ fn eval_expression(expr: Expression, env: &mut Environment) -> Object {
             body: func_lit.body,
             env: env.clone(),
         }),
-        _ => panic!("Unsupported expression type"),
+        Expression::Call(call_expr) => {
+            let function = eval_expression(*call_expr.function, env);
+            if let Object::Error(_) = function {
+                function
+            } else {
+                let args = eval_expressions(call_expr.arguments, env);
+                if args.len() == 1 {
+                    if let Object::Error(_) = args[0] {
+                        return args[0].clone();
+                    }
+                }
+
+                apply_function(function, args)
+            }
+        }
     }
 }
 
@@ -193,6 +207,60 @@ fn eval_identifier(ident: Identifier, env: &mut Environment) -> Object {
     } else {
         val.unwrap().clone()
     }
+}
+
+fn eval_expressions(exps: Vec<Expression>, env: &mut Environment) -> Vec<Object> {
+    let mut result = vec![];
+
+    for exp in exps {
+        let evaluated = eval_expression(exp, env);
+        if let Object::Error(_) = evaluated {
+            return vec![evaluated];
+        }
+        result.push(evaluated)
+    }
+
+    result
+}
+
+fn apply_function(func: Object, args: Vec<Object>) -> Object {
+    if let Object::Function(func_obj) = func {
+        let FunctionObject {
+            body,
+            env,
+            parameters,
+        } = func_obj;
+        if args.len() != parameters.len() {
+            return Object::Error(format!(
+                "wrong number of arguments passed. expected={}, got={}",
+                parameters.len(),
+                args.len()
+            ));
+        }
+        let mut extended_env = extend_function_env(parameters, args, env);
+        let evaluated = eval_statement(Statement::Block(body), &mut extended_env);
+        if let Object::ReturnValue(wrapped_obj) = evaluated {
+            *wrapped_obj
+        } else {
+            evaluated
+        }
+    } else {
+        Object::Error(format!("not a function: {}", func.get_type()))
+    }
+}
+
+fn extend_function_env(
+    parameters: Vec<Identifier>,
+    args: Vec<Object>,
+    env: Environment,
+) -> Environment {
+    let mut env = Environment::new_enclosed(env);
+
+    for i in 0..parameters.len() {
+        env.set(&parameters[i].value, args[i].clone());
+    }
+
+    env
 }
 
 #[cfg(test)]
@@ -413,6 +481,34 @@ mod test {
         } else {
             panic!("object is not Function. got={}", evaluated);
         }
+    }
+
+    #[test]
+    fn test_function_application() {
+        let tests = vec![
+            ("let identity = fn(x) { x; }; identity(5);", 5),
+            ("let identity = fn(x) { return x; }; identity(5);", 5),
+            ("let double = fn(x) { x * 2; }; double(5);", 10),
+            ("let add = fn(x, y) { x + y; }; add(5, 5);", 10),
+            ("let add = fn(x, y) { x + y; }; add(5 + 5, add(5, 5));", 20),
+            ("fn(x) { x; }(5)", 5),
+        ];
+
+        for (input, expected) in tests {
+            test_integer_object(test_eval(input), expected);
+        }
+    }
+
+    #[test]
+    fn test_closures() {
+        let input = r#"
+            let newAdder = fn(x) {
+                fn(y) { x + y };
+            };
+            let addTwo = newAdder(2);
+            addTwo(3);
+        "#;
+        test_integer_object(test_eval(input), 5);
     }
 
     // helpers
