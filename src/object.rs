@@ -11,6 +11,7 @@ pub enum Object {
     Error(String),
     Function(FunctionObject),
     String(String),
+    Builtin(BuiltinFunction),
 }
 
 impl Object {
@@ -27,6 +28,7 @@ impl Object {
             Object::Error(_) => "ERROR",
             Object::Function(_) => "FUNCTION",
             Object::String(_) => "STRING",
+            Object::Builtin(_) => "BUILTIN",
         }
     }
 }
@@ -41,6 +43,7 @@ impl fmt::Display for Object {
             Object::Error(message) => write!(f, "ERROR: {}", message),
             Object::Function(func) => write!(f, "{}", func),
             Object::String(st) => write!(f, "{}", st),
+            Object::Builtin(_) => write!(f, "builtin function"),
         }
     }
 }
@@ -66,3 +69,5 @@ impl fmt::Display for FunctionObject {
         )
     }
 }
+
+type BuiltinFunction = fn(Vec<Object>) -> Object;

@@ -1,5 +1,5 @@
 use crate::environment::Environment;
-use crate::evaluator::eval;
+use crate::evaluator::Evaluator;
 use crate::lexer::Lexer;
 use crate::object::Object;
 use crate::parser::Parser;
@@ -35,7 +35,8 @@ pub fn start(stdin: Stdin) {
             continue;
         }
 
-        let evaluated = eval(program, &mut env);
+        let evaluator = Evaluator::new();
+        let evaluated = evaluator.eval(program, &mut env);
         match evaluated {
             Object::Null => continue,
             _ => println!("{}", evaluated.inspect()),

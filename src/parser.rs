@@ -1,7 +1,7 @@
 use crate::ast::*;
 use crate::lexer::Lexer;
 use crate::token::{Token, TokenType};
-use std::{collections::HashMap, fmt::Write, mem};
+use std::{collections::HashMap, mem};
 
 type PrefixParseFn = fn(&mut Parser) -> Option<Expression>;
 type InfixParseFn = fn(&mut Parser, Expression) -> Option<Expression>;
@@ -464,6 +464,7 @@ impl Parser {
 mod tests {
 
     use super::*;
+    use std::fmt::Write;
 
     enum Expected {
         Int64(i64),

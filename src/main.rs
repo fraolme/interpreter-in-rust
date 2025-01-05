@@ -1,6 +1,7 @@
 use std::io;
 
 mod ast;
+mod builtins;
 mod environment;
 mod evaluator;
 mod lexer;
