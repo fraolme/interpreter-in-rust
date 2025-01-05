@@ -75,6 +75,14 @@ impl Lexer {
                 token_type: TokenType::Eof,
                 literal: String::from(""),
             },
+            '"' => {
+                self.read_char();
+                let string_val = self.read_string();
+                Token {
+                    token_type: TokenType::String,
+                    literal: string_val,
+                }
+            }
             _ => {
                 if Lexer::is_letter(self.ch) {
                     pointer_moved = true;
@@ -125,6 +133,14 @@ impl Lexer {
         self.input[position..self.position].to_string()
     }
 
+    fn read_string(&mut self) -> String {
+        let position = self.position;
+        while self.ch != '"' && self.ch != '\0' {
+            self.read_char();
+        }
+        self.input[position..self.position].to_string()
+    }
+
     fn skip_whitespace(&mut self) {
         while self.ch.is_ascii_whitespace() {
             self.read_char();
@@ -168,6 +184,9 @@ mod tests {
 
           10 == 10;
           10 != 9;
+          "foobar"
+          "foo bar"
+          ""
         "#,
         );
 
@@ -245,6 +264,9 @@ mod tests {
             (TokenType::NotEq, "!="),
             (TokenType::Int, "9"),
             (TokenType::SemiColon, ";"),
+            (TokenType::String, "foobar"),
+            (TokenType::String, "foo bar"),
+            (TokenType::String, ""),
             (TokenType::Eof, ""),
         ];
 

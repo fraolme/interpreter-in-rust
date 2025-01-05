@@ -53,6 +53,7 @@ impl Parser {
         prefix_parse_fns.insert(TokenType::Lparen, Parser::parse_grouped_expression);
         prefix_parse_fns.insert(TokenType::If, Parser::parse_if_expression);
         prefix_parse_fns.insert(TokenType::Function, Parser::parse_function_literal);
+        prefix_parse_fns.insert(TokenType::String, Parser::parse_string_literal);
 
         let mut infix_parse_fns: HashMap<TokenType, InfixParseFn> = HashMap::new();
         infix_parse_fns.insert(TokenType::Plus, Parser::parse_infix_expression);
@@ -404,6 +405,15 @@ impl Parser {
         }
 
         Some(args)
+    }
+
+    fn parse_string_literal(&mut self) -> Option<Expression> {
+        let cur_token = mem::take(&mut self.cur_token);
+        let value = cur_token.literal.to_string();
+        Some(Expression::String(StringLiteral {
+            token: cur_token,
+            value,
+        }))
     }
 
     // helper functions
@@ -898,6 +908,29 @@ mod tests {
                     Expected::Int64(4),
                     "+",
                     Expected::Int64(5),
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_string_literal_expression() {
+        let input = r#" "Hello world"; "#;
+        let lexer = Lexer::new(input.to_string());
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse_program();
+        check_parser_errors(&parser);
+        test_node_type(
+            program.statements[0].node_type(),
+            NodeType::ExpressionStatement,
+        );
+        if let Statement::Expression(stmt) = &program.statements[0] {
+            test_node_type(stmt.expression.node_type(), NodeType::StringLiteral);
+            if let Expression::String(sl) = &stmt.expression {
+                assert_eq!(
+                    sl.value, "Hello world",
+                    "value not {}. got={}",
+                    "Hello world", sl.value
                 );
             }
         }

@@ -83,6 +83,7 @@ fn eval_expression(expr: Expression, env: &mut Environment) -> Object {
                 apply_function(function, args)
             }
         }
+        Expression::String(sl) => Object::String(sl.value),
     }
 }
 
@@ -125,6 +126,9 @@ fn eval_infix_expression(operator: &str, left: Object, right: Object) -> Object 
             eval_boolean_infix_expression(operator, left_val, right_val)
         }
         (Object::Null, Object::Null) => Object::Boolean(true),
+        (Object::String(left_val), Object::String(right_val)) => {
+            eval_string_infix_expression(operator, left_val, right_val)
+        }
         _ => {
             // different type return false for == and != while it returns null for other types
             if operator == "==" || operator == "!=" {
@@ -261,6 +265,17 @@ fn extend_function_env(
     }
 
     env
+}
+
+fn eval_string_infix_expression(operator: &str, left_val: String, right_val: String) -> Object {
+    match operator {
+        "+" => Object::String(left_val + &right_val),
+        "==" => Object::Boolean(left_val == right_val),
+        "!=" => Object::Boolean(left_val != right_val),
+        ">" => Object::Boolean(left_val > right_val),
+        "<" => Object::Boolean(left_val < right_val),
+        _ => Object::Error(format!("unknown operator: STRING {} STRING", operator)),
+    }
 }
 
 #[cfg(test)]
@@ -424,6 +439,10 @@ mod test {
                 "unknown operator: BOOLEAN + BOOLEAN",
             ),
             ("foobar", "identifier not found: foobar"),
+            (
+                r#" "Hello" - "World" "#,
+                "unknown operator: STRING - STRING",
+            ),
         ];
 
         for (input, expected_msg) in tests {
@@ -509,6 +528,28 @@ mod test {
             addTwo(3);
         "#;
         test_integer_object(test_eval(input), 5);
+    }
+
+    #[test]
+    fn test_string_literal() {
+        let input = r#" "Hello World" "#;
+        let evaluated = test_eval(input);
+        if let Object::String(val) = evaluated {
+            assert_eq!(val, "Hello World", "String has wrong value. got={}", val);
+        } else {
+            panic!("object is not string. got={}", evaluated);
+        }
+    }
+
+    #[test]
+    fn test_string_concatenation() {
+        let input = r#" "Hello" + " " + "World!" "#;
+        let evaluated = test_eval(input);
+        if let Object::String(val) = evaluated {
+            assert_eq!(val, "Hello World!", "String has wrong value. got={}", val);
+        } else {
+            panic!("object is not string. got={}", evaluated);
+        }
     }
 
     // helpers

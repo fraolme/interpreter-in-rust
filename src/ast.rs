@@ -22,6 +22,7 @@ pub enum NodeType {
     BlockStatement,
     FunctionLiteral,
     CallExpression,
+    StringLiteral,
 }
 
 impl fmt::Display for NodeType {
@@ -40,6 +41,7 @@ impl fmt::Display for NodeType {
             NodeType::BlockStatement => "block_statement",
             NodeType::FunctionLiteral => "function_literal",
             NodeType::CallExpression => "function_call",
+            NodeType::StringLiteral => "string",
         };
 
         write!(f, "{}", val)
@@ -95,6 +97,7 @@ pub enum Expression {
     If(Box<IfExpression>),
     Func(FunctionLiteral),
     Call(Box<CallExpression>),
+    String(StringLiteral),
 }
 
 impl Node for Expression {
@@ -108,6 +111,7 @@ impl Node for Expression {
             Expression::If(if_exp) => if_exp.token_literal(),
             Expression::Func(func) => func.token_literal(),
             Expression::Call(call) => call.token_literal(),
+            Expression::String(sl) => sl.token_literal(),
         }
     }
 
@@ -121,6 +125,7 @@ impl Node for Expression {
             Expression::If(if_exp) => if_exp.node_type(),
             Expression::Func(func) => func.node_type(),
             Expression::Call(call) => call.node_type(),
+            Expression::String(sl) => sl.node_type(),
         }
     }
 }
@@ -136,6 +141,7 @@ impl fmt::Display for Expression {
             Expression::If(if_exp) => write!(f, "{}", if_exp),
             Expression::Func(func) => write!(f, "{}", func),
             Expression::Call(call) => write!(f, "{}", call),
+            Expression::String(sl) => write!(f, "{}", sl),
         }
     }
 }
@@ -470,5 +476,27 @@ impl fmt::Display for CallExpression {
             .collect::<Vec<String>>()
             .join(", ");
         write!(f, "{}({})", self.function, args)
+    }
+}
+
+#[derive(Clone)]
+pub struct StringLiteral {
+    pub token: Token,
+    pub value: String,
+}
+
+impl Node for StringLiteral {
+    fn token_literal(&self) -> &str {
+        &self.token.literal
+    }
+
+    fn node_type(&self) -> NodeType {
+        NodeType::StringLiteral
+    }
+}
+
+impl fmt::Display for StringLiteral {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.value)
     }
 }

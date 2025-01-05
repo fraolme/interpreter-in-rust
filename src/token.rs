@@ -39,6 +39,7 @@ pub enum TokenType {
     Rbrace,
     Eq,
     NotEq,
+    String,
     // keywords
     Function,
     Let,
@@ -87,6 +88,7 @@ impl fmt::Display for TokenType {
             TokenType::Rbrace => "}",
             TokenType::Eq => "==",
             TokenType::NotEq => "!=",
+            TokenType::String => "STRING",
             TokenType::Function => "FUNCTION",
             TokenType::Let => "LET",
             TokenType::True => "true",

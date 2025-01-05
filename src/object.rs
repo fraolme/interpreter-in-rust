@@ -10,6 +10,7 @@ pub enum Object {
     ReturnValue(Box<Object>),
     Error(String),
     Function(FunctionObject),
+    String(String),
 }
 
 impl Object {
@@ -25,6 +26,7 @@ impl Object {
             Object::ReturnValue(_) => "RETURN",
             Object::Error(_) => "ERROR",
             Object::Function(_) => "FUNCTION",
+            Object::String(_) => "STRING",
         }
     }
 }
@@ -38,6 +40,7 @@ impl fmt::Display for Object {
             Object::ReturnValue(obj) => write!(f, "{}", obj),
             Object::Error(message) => write!(f, "ERROR: {}", message),
             Object::Function(func) => write!(f, "{}", func),
+            Object::String(st) => write!(f, "{}", st),
         }
     }
 }
