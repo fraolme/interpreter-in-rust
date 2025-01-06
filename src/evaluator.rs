@@ -12,6 +12,10 @@ impl Evaluator {
     pub fn new() -> Self {
         let mut builtins_map = HashMap::new();
         builtins_map.insert("len".to_string(), Object::Builtin(builtins::len));
+        builtins_map.insert("first".to_string(), Object::Builtin(builtins::first));
+        builtins_map.insert("last".to_string(), Object::Builtin(builtins::last));
+        builtins_map.insert("rest".to_string(), Object::Builtin(builtins::rest));
+        builtins_map.insert("push".to_string(), Object::Builtin(builtins::push));
         Self {
             builtins: builtins_map,
         }
