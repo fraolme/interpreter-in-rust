@@ -15,6 +15,7 @@ enum Precedence {
     Product = 5,
     Prefix = 6,
     Call = 7,
+    Index = 8,
 }
 
 pub struct Parser {
@@ -42,6 +43,7 @@ impl Parser {
         precedence_map.insert(TokenType::Slash, Precedence::Product);
         precedence_map.insert(TokenType::Asterisk, Precedence::Product);
         precedence_map.insert(TokenType::Lparen, Precedence::Call);
+        precedence_map.insert(TokenType::Lbracket, Precedence::Index);
 
         let mut prefix_parse_fns: HashMap<TokenType, PrefixParseFn> = HashMap::new();
         prefix_parse_fns.insert(TokenType::Ident, Parser::parse_identifier);
@@ -54,6 +56,7 @@ impl Parser {
         prefix_parse_fns.insert(TokenType::If, Parser::parse_if_expression);
         prefix_parse_fns.insert(TokenType::Function, Parser::parse_function_literal);
         prefix_parse_fns.insert(TokenType::String, Parser::parse_string_literal);
+        prefix_parse_fns.insert(TokenType::Lbracket, Parser::parse_array_literal);
 
         let mut infix_parse_fns: HashMap<TokenType, InfixParseFn> = HashMap::new();
         infix_parse_fns.insert(TokenType::Plus, Parser::parse_infix_expression);
@@ -65,6 +68,7 @@ impl Parser {
         infix_parse_fns.insert(TokenType::LessThan, Parser::parse_infix_expression);
         infix_parse_fns.insert(TokenType::GreaterThan, Parser::parse_infix_expression);
         infix_parse_fns.insert(TokenType::Lparen, Parser::parse_call_expression);
+        infix_parse_fns.insert(TokenType::Lbracket, Parser::parse_index_expression);
 
         Parser {
             lexer,
@@ -372,39 +376,13 @@ impl Parser {
 
     fn parse_call_expression(&mut self, function: Expression) -> Option<Expression> {
         let cur_token = mem::take(&mut self.cur_token);
-        let arguments = self.parse_call_arguments()?;
+        let arguments = self.parse_expression_list(TokenType::Rparen)?;
 
         Some(Expression::Call(Box::new(CallExpression {
             token: cur_token,
             function: Box::new(function),
             arguments,
         })))
-    }
-
-    fn parse_call_arguments(&mut self) -> Option<Vec<Expression>> {
-        let mut args: Vec<Expression> = vec![];
-        if self.peek_token_is(TokenType::Rparen) {
-            self.next_token();
-            return Some(args);
-        }
-
-        self.next_token();
-        let arg = self.parse_expression(Precedence::Lowest)?;
-        args.push(arg);
-
-        while self.peek_token_is(TokenType::Comma) {
-            self.next_token();
-            self.next_token();
-
-            let arg = self.parse_expression(Precedence::Lowest)?;
-            args.push(arg);
-        }
-
-        if !self.expect_peek(TokenType::Rparen) {
-            return None;
-        }
-
-        Some(args)
     }
 
     fn parse_string_literal(&mut self) -> Option<Expression> {
@@ -416,7 +394,58 @@ impl Parser {
         }))
     }
 
+    fn parse_array_literal(&mut self) -> Option<Expression> {
+        let cur_token = mem::take(&mut self.cur_token);
+        let elements = self.parse_expression_list(TokenType::Rbracket)?;
+
+        Some(Expression::Array(ArrayLiteral {
+            token: cur_token,
+            elements,
+        }))
+    }
+
+    fn parse_index_expression(&mut self, left: Expression) -> Option<Expression> {
+        let cur_token = mem::take(&mut self.cur_token);
+        self.next_token();
+        let index = self.parse_expression(Precedence::Lowest)?;
+
+        if !self.expect_peek(TokenType::Rbracket) {
+            return None;
+        }
+
+        Some(Expression::Index(Box::new(IndexExpression {
+            token: cur_token,
+            left: Box::new(left),
+            index: Box::new(index),
+        })))
+    }
+
     // helper functions
+    fn parse_expression_list(&mut self, end: TokenType) -> Option<Vec<Expression>> {
+        if self.peek_token_is(end) {
+            return Some(vec![]);
+        }
+
+        self.next_token();
+        let mut list = vec![];
+        let item = self.parse_expression(Precedence::Lowest)?;
+        list.push(item);
+
+        while self.peek_token_is(TokenType::Comma) {
+            self.next_token();
+            self.next_token();
+
+            let item = self.parse_expression(Precedence::Lowest)?;
+            list.push(item);
+        }
+
+        if !self.expect_peek(end) {
+            return None;
+        }
+
+        Some(list)
+    }
+
     fn cur_token_is(&self, token_type: TokenType) -> bool {
         self.cur_token.token_type == token_type
     }
@@ -724,6 +753,14 @@ mod tests {
                 "add(a + b + c * d / f + g)",
                 "add((((a + b) + ((c * d) / f)) + g))",
             ),
+            (
+                "a * [1, 2, 3, 4][b * c] * d",
+                "((a * ([1, 2, 3, 4][(b * c)])) * d)",
+            ),
+            (
+                "add(a * b[2], b[1], 2 * [1,2][1])",
+                "add((a * (b[2])), (b[1]), (2 * ([1, 2][1])))",
+            ),
         ];
 
         for (input, expected) in tests {
@@ -933,6 +970,65 @@ mod tests {
                     "value not {}. got={}",
                     "Hello world", sl.value
                 );
+            }
+        }
+    }
+
+    #[test]
+    fn test_parsing_array_literals() {
+        let input = "[1, 2 * 2, 3 + 3]";
+        let lexer = Lexer::new(input.to_string());
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse_program();
+        check_parser_errors(&parser);
+
+        test_node_type(
+            program.statements[0].node_type(),
+            NodeType::ExpressionStatement,
+        );
+        if let Statement::Expression(stmt) = &program.statements[0] {
+            test_node_type(stmt.expression.node_type(), NodeType::ArrayLiteral);
+            if let Expression::Array(arr_lit) = &stmt.expression {
+                assert_eq!(
+                    arr_lit.elements.len(),
+                    3,
+                    "array.elements.len() not 3. got={}",
+                    arr_lit.elements.len()
+                );
+                test_integer_literal(&arr_lit.elements[0], 1);
+                test_infix_expression(
+                    &arr_lit.elements[1],
+                    Expected::Int64(2),
+                    "*",
+                    Expected::Int64(2),
+                );
+                test_infix_expression(
+                    &arr_lit.elements[2],
+                    Expected::Int64(3),
+                    "+",
+                    Expected::Int64(3),
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_parsing_index_expressions() {
+        let input = "myArray[1 + 1]";
+        let lexer = Lexer::new(input.to_string());
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse_program();
+        check_parser_errors(&parser);
+
+        test_node_type(
+            program.statements[0].node_type(),
+            NodeType::ExpressionStatement,
+        );
+        if let Statement::Expression(stmt) = &program.statements[0] {
+            test_node_type(stmt.expression.node_type(), NodeType::IndexExpression);
+            if let Expression::Index(ind_exp) = &stmt.expression {
+                test_identifier(&ind_exp.left, "myArray");
+                test_infix_expression(&ind_exp.index, Expected::Int64(1), "+", Expected::Int64(1));
             }
         }
     }

@@ -23,6 +23,8 @@ pub enum NodeType {
     FunctionLiteral,
     CallExpression,
     StringLiteral,
+    ArrayLiteral,
+    IndexExpression,
 }
 
 impl fmt::Display for NodeType {
@@ -42,6 +44,8 @@ impl fmt::Display for NodeType {
             NodeType::FunctionLiteral => "function_literal",
             NodeType::CallExpression => "function_call",
             NodeType::StringLiteral => "string",
+            NodeType::ArrayLiteral => "array",
+            NodeType::IndexExpression => "index",
         };
 
         write!(f, "{}", val)
@@ -98,6 +102,8 @@ pub enum Expression {
     Func(FunctionLiteral),
     Call(Box<CallExpression>),
     String(StringLiteral),
+    Array(ArrayLiteral),
+    Index(Box<IndexExpression>),
 }
 
 impl Node for Expression {
@@ -112,6 +118,8 @@ impl Node for Expression {
             Expression::Func(func) => func.token_literal(),
             Expression::Call(call) => call.token_literal(),
             Expression::String(sl) => sl.token_literal(),
+            Expression::Array(arr) => arr.token_literal(),
+            Expression::Index(index) => index.token_literal(),
         }
     }
 
@@ -126,6 +134,8 @@ impl Node for Expression {
             Expression::Func(func) => func.node_type(),
             Expression::Call(call) => call.node_type(),
             Expression::String(sl) => sl.node_type(),
+            Expression::Array(arr) => arr.node_type(),
+            Expression::Index(index) => index.node_type(),
         }
     }
 }
@@ -142,6 +152,8 @@ impl fmt::Display for Expression {
             Expression::Func(func) => write!(f, "{}", func),
             Expression::Call(call) => write!(f, "{}", call),
             Expression::String(sl) => write!(f, "{}", sl),
+            Expression::Array(arr) => write!(f, "{}", arr),
+            Expression::Index(index) => write!(f, "{}", index),
         }
     }
 }
@@ -498,5 +510,58 @@ impl Node for StringLiteral {
 impl fmt::Display for StringLiteral {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.value)
+    }
+}
+
+#[derive(Clone)]
+pub struct ArrayLiteral {
+    pub token: Token, // [
+    pub elements: Vec<Expression>,
+}
+
+impl Node for ArrayLiteral {
+    fn token_literal(&self) -> &str {
+        &self.token.literal
+    }
+
+    fn node_type(&self) -> NodeType {
+        NodeType::ArrayLiteral
+    }
+}
+
+impl fmt::Display for ArrayLiteral {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "[{}]",
+            self.elements
+                .iter()
+                .map(|v| v.to_string())
+                .collect::<Vec<String>>()
+                .join(", ")
+        )
+    }
+}
+
+#[derive(Clone)]
+pub struct IndexExpression {
+    pub token: Token, //[
+    pub left: Box<Expression>,
+    pub index: Box<Expression>,
+}
+
+impl Node for IndexExpression {
+    fn token_literal(&self) -> &str {
+        &self.token.literal
+    }
+
+    fn node_type(&self) -> NodeType {
+        NodeType::IndexExpression
+    }
+}
+
+impl fmt::Display for IndexExpression {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "({}[{}])", self.left, self.index)
     }
 }

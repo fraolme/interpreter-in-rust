@@ -12,6 +12,7 @@ pub enum Object {
     Function(FunctionObject),
     String(String),
     Builtin(BuiltinFunction),
+    Array(Vec<Object>),
 }
 
 impl Object {
@@ -29,6 +30,7 @@ impl Object {
             Object::Function(_) => "FUNCTION",
             Object::String(_) => "STRING",
             Object::Builtin(_) => "BUILTIN",
+            Object::Array(_) => "ARRAY",
         }
     }
 }
@@ -44,6 +46,14 @@ impl fmt::Display for Object {
             Object::Function(func) => write!(f, "{}", func),
             Object::String(st) => write!(f, "{}", st),
             Object::Builtin(_) => write!(f, "builtin function"),
+            Object::Array(arr) => write!(
+                f,
+                "[{}]",
+                arr.iter()
+                    .map(|v| v.to_string())
+                    .collect::<Vec<String>>()
+                    .join(", ")
+            ),
         }
     }
 }

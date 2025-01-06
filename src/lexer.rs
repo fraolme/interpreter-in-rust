@@ -71,6 +71,8 @@ impl Lexer {
             '>' => Token::new(TokenType::GreaterThan, self.ch),
             '{' => Token::new(TokenType::Lbrace, self.ch),
             '}' => Token::new(TokenType::Rbrace, self.ch),
+            '[' => Token::new(TokenType::Lbracket, self.ch),
+            ']' => Token::new(TokenType::Rbracket, self.ch),
             '\0' => Token {
                 token_type: TokenType::Eof,
                 literal: String::from(""),
@@ -187,6 +189,7 @@ mod tests {
           "foobar"
           "foo bar"
           ""
+          [1, 2];
         "#,
         );
 
@@ -267,6 +270,12 @@ mod tests {
             (TokenType::String, "foobar"),
             (TokenType::String, "foo bar"),
             (TokenType::String, ""),
+            (TokenType::Lbracket, "["),
+            (TokenType::Int, "1"),
+            (TokenType::Comma, ","),
+            (TokenType::Int, "2"),
+            (TokenType::Rbracket, "]"),
+            (TokenType::SemiColon, ";"),
             (TokenType::Eof, ""),
         ];
 

@@ -99,6 +99,26 @@ impl Evaluator {
                 }
             }
             Expression::String(sl) => Object::String(sl.value),
+            Expression::Array(arr) => {
+                let arr_elts = self.eval_expressions(arr.elements, env);
+                if arr_elts.len() == 1 {
+                    if let Object::Error(_) = &arr_elts[0] {
+                        return arr_elts[0].clone();
+                    }
+                }
+                Object::Array(arr_elts)
+            }
+            Expression::Index(index_exp) => {
+                let left = self.eval_expression(*index_exp.left, env);
+                if let Object::Error(_) = left {
+                    return left;
+                }
+                let index = self.eval_expression(*index_exp.index, env);
+                if let Object::Error(_) = index {
+                    return index;
+                }
+                self.eval_index_expression(left, index)
+            }
         }
     }
 
@@ -313,6 +333,28 @@ impl Evaluator {
             ">" => Object::Boolean(left_val > right_val),
             "<" => Object::Boolean(left_val < right_val),
             _ => Object::Error(format!("unknown operator: STRING {} STRING", operator)),
+        }
+    }
+
+    fn eval_index_expression(&self, left: Object, index: Object) -> Object {
+        let left_type = left.get_type().to_string();
+        let index_type = index.get_type().to_string();
+        match (left, index) {
+            (Object::Array(arr), Object::Integer(intv)) => {
+                self.eval_array_index_expression(arr, intv)
+            }
+            _ => Object::Error(format!(
+                "index operator not supported: {}[{}]",
+                left_type, index_type
+            )),
+        }
+    }
+
+    fn eval_array_index_expression(&self, arr: Vec<Object>, index: i64) -> Object {
+        if index < 0 || index as usize >= arr.len() {
+            Object::Null
+        } else {
+            arr[index as usize].clone()
         }
     }
 }
@@ -623,6 +665,52 @@ mod test {
                     }
                 }
                 _ => panic!("unhandled expected value"),
+            }
+        }
+    }
+
+    #[test]
+    fn test_array_literals() {
+        let input = "[1, 2 * 2, 3 + 3]";
+        let evaluated = test_eval(input);
+        if let Object::Array(arr) = evaluated {
+            assert_eq!(
+                arr.len(),
+                3,
+                "array has wrong num of elements. got={}",
+                arr.len()
+            );
+            test_integer_object(arr[0].clone(), 1);
+            test_integer_object(arr[1].clone(), 4);
+            test_integer_object(arr[2].clone(), 6);
+        } else {
+            panic!("object is not Array. got={}", evaluated);
+        }
+    }
+
+    #[test]
+    fn test_array_index_expressions() {
+        let tests = vec![
+            ("[1, 2, 3][0]", Expected::Int64(1)),
+            ("[1, 2, 3][1]", Expected::Int64(2)),
+            ("[1, 2, 3][2]", Expected::Int64(3)),
+            ("let i = 0; [1][i]", Expected::Int64(1)),
+            ("[1, 2, 3][1 + 1]", Expected::Int64(3)),
+            ("let myArray = [1, 2, 3]; myArray[2]", Expected::Int64(3)),
+            (
+                "let myArray = [1, 2, 3]; let i = myArray[0]; myArray[i]",
+                Expected::Int64(2),
+            ),
+            ("[1, 2, 3][3]", Expected::Null),
+            ("[1, 2, 3][-1]", Expected::Null),
+        ];
+
+        for (input, expected) in tests {
+            let evaluated = test_eval(input);
+            match expected {
+                Expected::Int64(v) => test_integer_object(evaluated, v),
+                Expected::Null => test_null_object(evaluated),
+                _ => panic!("expected value is wrong"),
             }
         }
     }

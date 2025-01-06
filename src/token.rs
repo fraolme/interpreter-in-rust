@@ -40,6 +40,8 @@ pub enum TokenType {
     Eq,
     NotEq,
     String,
+    Lbracket,
+    Rbracket,
     // keywords
     Function,
     Let,
@@ -89,6 +91,8 @@ impl fmt::Display for TokenType {
             TokenType::Eq => "==",
             TokenType::NotEq => "!=",
             TokenType::String => "STRING",
+            TokenType::Lbracket => "[",
+            TokenType::Rbracket => "]",
             TokenType::Function => "FUNCTION",
             TokenType::Let => "LET",
             TokenType::True => "true",
