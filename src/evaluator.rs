@@ -123,6 +123,7 @@ impl Evaluator {
                 }
                 self.eval_index_expression(left, index)
             }
+            Expression::Hash(hash) => self.eval_hash_literal(hash, env),
         }
     }
 
@@ -343,10 +344,11 @@ impl Evaluator {
     fn eval_index_expression(&self, left: Object, index: Object) -> Object {
         let left_type = left.get_type().to_string();
         let index_type = index.get_type().to_string();
-        match (left, index) {
+        match (left, &index) {
             (Object::Array(arr), Object::Integer(intv)) => {
-                self.eval_array_index_expression(arr, intv)
+                self.eval_array_index_expression(arr, *intv)
             }
+            (Object::Hash(hash), _) => self.eval_hash_index_expression(hash, index),
             _ => Object::Error(format!(
                 "index operator not supported: {}[{}]",
                 left_type, index_type
@@ -359,6 +361,45 @@ impl Evaluator {
             Object::Null
         } else {
             arr[index as usize].clone()
+        }
+    }
+
+    fn eval_hash_literal(&self, hash: HashLiteral, env: &mut Environment) -> Object {
+        let mut map = HashMap::new();
+        for (key, value) in hash.pairs {
+            let key_obj = self.eval_expression(key, env);
+            if let Object::Error(_) = key_obj {
+                return key_obj;
+            } else if let Object::Integer(_) | Object::Boolean(_) | Object::String(_) = key_obj {
+                let val_obj = self.eval_expression(value, env);
+                if let Object::Error(_) = val_obj {
+                    return val_obj;
+                }
+                map.insert(key_obj, val_obj);
+            } else {
+                return Object::Error(format!(
+                    "This type can't be used as a key for a hashmap, got={}",
+                    key_obj.get_type()
+                ));
+            }
+        }
+
+        Object::Hash(map)
+    }
+
+    fn eval_hash_index_expression(&self, hash: HashMap<Object, Object>, key: Object) -> Object {
+        if let Object::Integer(_) | Object::Boolean(_) | Object::String(_) = key {
+            let val = hash.get(&key);
+            if val.is_none() {
+                return Object::Null;
+            } else {
+                return val.unwrap().clone();
+            }
+        } else {
+            return Object::Error(format!(
+                "This type can't be used as a key for a hashmap, got={}",
+                key.get_type()
+            ));
         }
     }
 }
@@ -527,6 +568,10 @@ mod test {
             (
                 r#" "Hello" - "World" "#,
                 "unknown operator: STRING - STRING",
+            ),
+            (
+                r#"{"name": "Monkey"}[fn(x) { x }]"#,
+                "This type can't be used as a key for a hashmap, got=FUNCTION",
             ),
         ];
 
@@ -715,6 +760,67 @@ mod test {
                 Expected::Int64(v) => test_integer_object(evaluated, v),
                 Expected::Null => test_null_object(evaluated),
                 _ => panic!("expected value is wrong"),
+            }
+        }
+    }
+
+    #[test]
+    fn test_hash_literals() {
+        let input = r#"
+            let two = "two";
+            {
+                "one": 10 - 9,
+                two: 1 + 1,
+                "thr" + "ee": 6/2,
+                4: 4,
+                true: 5,
+                false: 6,
+            }
+        "#;
+        let evaluated = test_eval(input);
+        if let Object::Hash(hash) = evaluated {
+            let mut expected = HashMap::new();
+            expected.insert(Object::String("one".to_string()), 1);
+            expected.insert(Object::String("two".to_string()), 2);
+            expected.insert(Object::String("three".to_string()), 3);
+            expected.insert(Object::Integer(4), 4);
+            expected.insert(Object::Boolean(true), 5);
+            expected.insert(Object::Boolean(false), 6);
+
+            assert_eq!(
+                hash.len(),
+                expected.len(),
+                "Hash has wrong num of pairs. got={}",
+                hash.len()
+            );
+
+            for (expected_key, expected_value) in &expected {
+                let hash_val = hash.get(expected_key);
+                assert!(hash_val.is_some(), "no pair for given key in map");
+                test_integer_object(hash_val.unwrap().clone(), *expected_value);
+            }
+        } else {
+            panic!("eval didn't return hash. got={}", evaluated);
+        }
+    }
+
+    fn test_hash_index_expression() {
+        let tests = vec![
+            (r#"{"foo": 5}["foo"]"#, Expected::Int64(5)),
+            (r#"{"foo": 5}["bar"]"#, Expected::Null),
+            (r#"let key = "foo"; {"foo": 5}[key]"#, Expected::Int64(5)),
+            (r#"{}["foo"]"#, Expected::Null),
+            (r#"{true: 5}[true]"#, Expected::Int64(5)),
+            (r#"{false: 5}[false]"#, Expected::Int64(5)),
+            (r#"{5: 5}[5]"#, Expected::Int64(5)),
+        ];
+
+        for (input, expected) in tests {
+            let evaluated = test_eval(input);
+            match expected {
+                Expected::Int64(val) => test_integer_object(evaluated, val),
+                Expected::Null => test_null_object(evaluated),
+                _ => panic!("unexpected value"),
             }
         }
     }

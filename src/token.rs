@@ -1,7 +1,7 @@
 use std::fmt;
 
 //Default is useful when we use mem::take for ownership change
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
 pub struct Token {
     pub token_type: TokenType,
     pub literal: String,
@@ -42,6 +42,7 @@ pub enum TokenType {
     String,
     Lbracket,
     Rbracket,
+    Colon,
     // keywords
     Function,
     Let,
@@ -93,6 +94,7 @@ impl fmt::Display for TokenType {
             TokenType::String => "STRING",
             TokenType::Lbracket => "[",
             TokenType::Rbracket => "]",
+            TokenType::Colon => ":",
             TokenType::Function => "FUNCTION",
             TokenType::Let => "LET",
             TokenType::True => "true",

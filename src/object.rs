@@ -1,8 +1,10 @@
 use crate::ast::{BlockStatement, Identifier};
 use crate::environment::Environment;
+use std::collections::HashMap;
 use std::fmt;
+use std::hash::{Hash, Hasher};
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq)]
 pub enum Object {
     Integer(i64),
     Boolean(bool),
@@ -13,6 +15,7 @@ pub enum Object {
     String(String),
     Builtin(BuiltinFunction),
     Array(Vec<Object>),
+    Hash(HashMap<Object, Object>),
 }
 
 impl Object {
@@ -31,6 +34,7 @@ impl Object {
             Object::String(_) => "STRING",
             Object::Builtin(_) => "BUILTIN",
             Object::Array(_) => "ARRAY",
+            Object::Hash(_) => "HASH",
         }
     }
 }
@@ -54,11 +58,34 @@ impl fmt::Display for Object {
                     .collect::<Vec<String>>()
                     .join(", ")
             ),
+            Object::Hash(hash) => write!(
+                f,
+                "{{{}}}",
+                hash.iter()
+                    .map(|(k, v)| format!("{}: {}", k, v))
+                    .collect::<Vec<String>>()
+                    .join(", ")
+            ),
         }
     }
 }
 
-#[derive(Clone)]
+impl Hash for Object {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        std::mem::discriminant(self).hash(state);
+        match self {
+            Object::Integer(val) => val.hash(state),
+            Object::Boolean(val) => val.hash(state),
+            Object::String(val) => val.hash(state),
+            _ => panic!(
+                "This type can't be used as a key for a hashmap, got={}",
+                self.get_type()
+            ),
+        }
+    }
+}
+
+#[derive(Clone, PartialEq, Eq)]
 pub struct FunctionObject {
     pub parameters: Vec<Identifier>,
     pub body: BlockStatement,
@@ -81,3 +108,46 @@ impl fmt::Display for FunctionObject {
 }
 
 type BuiltinFunction = fn(Vec<Object>) -> Object;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::hash::DefaultHasher;
+
+    #[test]
+    fn test_string_hash_key() {
+        let hello1_hash = calculate_hash(Object::String("Hello World".to_string()));
+        let hello2_hash = calculate_hash(Object::String("Hello World".to_string()));
+
+        let diff1_hash = calculate_hash(Object::String("My name is John".to_string()));
+        let diff2_hash = calculate_hash(Object::String("My name is John".to_string()));
+
+        assert_eq!(
+            hello1_hash, hello2_hash,
+            "strings with same content have different hash keys"
+        );
+
+        assert_eq!(
+            diff1_hash, diff2_hash,
+            "strings with same content have different hash keys"
+        );
+
+        assert_ne!(
+            hello1_hash, diff1_hash,
+            "strings with different content have same hash key"
+        );
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_using_null_as_hash_key() {
+        calculate_hash(Object::Null);
+    }
+
+    // helper
+    fn calculate_hash(val: Object) -> u64 {
+        let mut hasher = DefaultHasher::new();
+        val.hash(&mut hasher);
+        hasher.finish()
+    }
+}

@@ -1,6 +1,8 @@
 use crate::token::Token;
+use std::collections::HashMap;
 use std::fmt;
 use std::fmt::Write;
+use std::hash::{Hash, Hasher};
 
 pub trait Node: fmt::Display {
     fn token_literal(&self) -> &str;
@@ -25,6 +27,7 @@ pub enum NodeType {
     StringLiteral,
     ArrayLiteral,
     IndexExpression,
+    HashLiteral,
 }
 
 impl fmt::Display for NodeType {
@@ -46,13 +49,14 @@ impl fmt::Display for NodeType {
             NodeType::StringLiteral => "string",
             NodeType::ArrayLiteral => "array",
             NodeType::IndexExpression => "index",
+            NodeType::HashLiteral => "hash",
         };
 
         write!(f, "{}", val)
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub enum Statement {
     Let(LetStatement),
     Return(ReturnStatement),
@@ -91,7 +95,7 @@ impl fmt::Display for Statement {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub enum Expression {
     Ident(Identifier),
     Int(IntegerLiteral),
@@ -104,6 +108,7 @@ pub enum Expression {
     String(StringLiteral),
     Array(ArrayLiteral),
     Index(Box<IndexExpression>),
+    Hash(HashLiteral),
 }
 
 impl Node for Expression {
@@ -120,6 +125,7 @@ impl Node for Expression {
             Expression::String(sl) => sl.token_literal(),
             Expression::Array(arr) => arr.token_literal(),
             Expression::Index(index) => index.token_literal(),
+            Expression::Hash(hash) => hash.token_literal(),
         }
     }
 
@@ -136,6 +142,7 @@ impl Node for Expression {
             Expression::String(sl) => sl.node_type(),
             Expression::Array(arr) => arr.node_type(),
             Expression::Index(index) => index.node_type(),
+            Expression::Hash(hash) => hash.node_type(),
         }
     }
 }
@@ -154,6 +161,7 @@ impl fmt::Display for Expression {
             Expression::String(sl) => write!(f, "{}", sl),
             Expression::Array(arr) => write!(f, "{}", arr),
             Expression::Index(index) => write!(f, "{}", index),
+            Expression::Hash(hash) => write!(f, "{}", hash),
         }
     }
 }
@@ -187,7 +195,7 @@ impl fmt::Display for Program {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub struct LetStatement {
     pub token: Token,
     pub name: Identifier,
@@ -215,7 +223,7 @@ impl fmt::Display for LetStatement {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub struct Identifier {
     pub token: Token,
     pub value: String,
@@ -237,7 +245,7 @@ impl fmt::Display for Identifier {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub struct ReturnStatement {
     pub token: Token,
     pub return_value: Expression,
@@ -263,7 +271,7 @@ impl fmt::Display for ReturnStatement {
 }
 
 // for this kind of statements -> x + 10;
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub struct ExpressionStatement {
     pub token: Token,
     pub expression: Expression,
@@ -285,7 +293,7 @@ impl fmt::Display for ExpressionStatement {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub struct IntegerLiteral {
     pub token: Token,
     pub value: i64,
@@ -307,7 +315,7 @@ impl fmt::Display for IntegerLiteral {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub struct PrefixExpression {
     pub token: Token,
     pub operator: String,
@@ -330,7 +338,7 @@ impl fmt::Display for PrefixExpression {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub struct InfixExpression {
     pub token: Token,
     pub left: Box<Expression>,
@@ -354,7 +362,7 @@ impl fmt::Display for InfixExpression {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub struct BooleanLiteral {
     pub token: Token,
     pub value: bool,
@@ -376,7 +384,7 @@ impl fmt::Display for BooleanLiteral {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub struct IfExpression {
     pub token: Token, // if token
     pub condition: Box<Expression>,
@@ -406,7 +414,7 @@ impl fmt::Display for IfExpression {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub struct BlockStatement {
     pub token: Token, // { token
     pub statements: Vec<Statement>,
@@ -433,7 +441,7 @@ impl fmt::Display for BlockStatement {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub struct FunctionLiteral {
     pub token: Token, // fn token
     pub parameters: Vec<Identifier>,
@@ -462,7 +470,7 @@ impl fmt::Display for FunctionLiteral {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub struct CallExpression {
     pub token: Token,              // the ( token
     pub function: Box<Expression>, // identifier or function literal
@@ -491,7 +499,7 @@ impl fmt::Display for CallExpression {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub struct StringLiteral {
     pub token: Token,
     pub value: String,
@@ -513,7 +521,7 @@ impl fmt::Display for StringLiteral {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub struct ArrayLiteral {
     pub token: Token, // [
     pub elements: Vec<Expression>,
@@ -543,7 +551,7 @@ impl fmt::Display for ArrayLiteral {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub struct IndexExpression {
     pub token: Token, //[
     pub left: Box<Expression>,
@@ -563,5 +571,43 @@ impl Node for IndexExpression {
 impl fmt::Display for IndexExpression {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "({}[{}])", self.left, self.index)
+    }
+}
+
+#[derive(Clone, PartialEq, Eq)]
+pub struct HashLiteral {
+    pub token: Token, // {
+    pub pairs: HashMap<Expression, Expression>,
+}
+
+impl Node for HashLiteral {
+    fn token_literal(&self) -> &str {
+        &self.token.literal
+    }
+
+    fn node_type(&self) -> NodeType {
+        NodeType::HashLiteral
+    }
+}
+
+impl fmt::Display for HashLiteral {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "{{{}}}",
+            self.pairs
+                .iter()
+                .map(|(k, v)| k.to_string() + ":" + &v.to_string())
+                .collect::<Vec<String>>()
+                .join(", ")
+        )
+    }
+}
+
+// implement a custom Hash Trait since hashmap doesn't implement Hash trait
+// by ignoring the hashmap during hash creation
+impl Hash for HashLiteral {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.token.hash(state);
     }
 }
