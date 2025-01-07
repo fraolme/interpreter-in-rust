@@ -16,6 +16,7 @@ impl Evaluator {
         builtins_map.insert("last".to_string(), Object::Builtin(builtins::last));
         builtins_map.insert("rest".to_string(), Object::Builtin(builtins::rest));
         builtins_map.insert("push".to_string(), Object::Builtin(builtins::push));
+        builtins_map.insert("puts".to_string(), Object::Builtin(builtins::puts));
         Self {
             builtins: builtins_map,
         }

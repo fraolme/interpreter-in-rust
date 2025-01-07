@@ -128,3 +128,11 @@ pub fn push(args: Vec<Object>) -> Object {
         )),
     }
 }
+
+pub fn puts(args: Vec<Object>) -> Object {
+    for item in args {
+        println!("{}", item);
+    }
+
+    Object::Null
+}
