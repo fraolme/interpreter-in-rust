@@ -1,4 +1,4 @@
-use crate::ast::{BlockStatement, Identifier};
+use crate::ast::{Expression, Statement};
 use crate::environment::Environment;
 use std::collections::HashMap;
 use std::fmt;
@@ -16,6 +16,7 @@ pub enum Object {
     Builtin(BuiltinFunction),
     Array(Vec<Object>),
     Hash(HashMap<Object, Object>),
+    Quote(Expression),
 }
 
 impl Object {
@@ -35,6 +36,7 @@ impl Object {
             Object::Builtin(_) => "BUILTIN",
             Object::Array(_) => "ARRAY",
             Object::Hash(_) => "HASH",
+            Object::Quote(_) => "QUOTE",
         }
     }
 }
@@ -66,6 +68,7 @@ impl fmt::Display for Object {
                     .collect::<Vec<String>>()
                     .join(", ")
             ),
+            Object::Quote(exp) => write!(f, "QUOTE({})", exp),
         }
     }
 }
@@ -87,8 +90,8 @@ impl Hash for Object {
 
 #[derive(Clone, PartialEq, Eq)]
 pub struct FunctionObject {
-    pub parameters: Vec<Identifier>,
-    pub body: BlockStatement,
+    pub parameters: Vec<Expression>,
+    pub body: Statement,
     pub env: Environment,
 }
 
@@ -99,7 +102,7 @@ impl fmt::Display for FunctionObject {
             "fn ({}) {{\n {} \n}}",
             self.parameters
                 .iter()
-                .map(|p| p.value.clone())
+                .map(|p| p.to_string())
                 .collect::<Vec<String>>()
                 .join(", "),
             self.body

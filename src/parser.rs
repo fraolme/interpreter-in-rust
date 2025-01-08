@@ -117,10 +117,10 @@ impl Parser {
         let identifier_value = self.cur_token.literal.clone();
         let identifier_token = mem::take(&mut self.cur_token);
 
-        let identifier = Identifier {
+        let identifier = Expression::Ident(Identifier {
             token: identifier_token,
             value: identifier_value,
-        };
+        });
 
         if !self.expect_peek(TokenType::Assign) {
             return None;
@@ -284,7 +284,7 @@ impl Parser {
         }
 
         let consequence = self.parse_block_statement();
-        let mut alternative: Option<BlockStatement> = None;
+        let mut alternative: Option<Statement> = None;
 
         if self.peek_token_is(TokenType::Else) {
             self.next_token();
@@ -303,7 +303,7 @@ impl Parser {
         })));
     }
 
-    fn parse_block_statement(&mut self) -> BlockStatement {
+    fn parse_block_statement(&mut self) -> Statement {
         let cur_token = mem::take(&mut self.cur_token);
         self.next_token();
         let mut stmts = vec![];
@@ -315,10 +315,10 @@ impl Parser {
             self.next_token();
         }
 
-        BlockStatement {
+        Statement::Block(BlockStatement {
             token: cur_token,
             statements: stmts,
-        }
+        })
     }
 
     fn parse_function_literal(&mut self) -> Option<Expression> {
@@ -336,12 +336,12 @@ impl Parser {
         Some(Expression::Func(FunctionLiteral {
             token: cur_token,
             parameters: params,
-            body,
+            body: Box::new(body),
         }))
     }
 
-    fn parse_function_parameters(&mut self) -> Option<Vec<Identifier>> {
-        let mut identifiers: Vec<Identifier> = vec![];
+    fn parse_function_parameters(&mut self) -> Option<Vec<Expression>> {
+        let mut identifiers: Vec<Expression> = vec![];
 
         if self.peek_token_is(TokenType::Rparen) {
             self.next_token();
@@ -351,20 +351,20 @@ impl Parser {
         self.next_token();
 
         let literal = self.cur_token.literal.clone();
-        let ident = Identifier {
+        let ident = Expression::Ident(Identifier {
             token: mem::take(&mut self.cur_token),
             value: literal,
-        };
+        });
         identifiers.push(ident);
 
         while self.peek_token_is(TokenType::Comma) {
             self.next_token();
             self.next_token();
             let literal = self.cur_token.literal.clone();
-            let ident = Identifier {
+            let ident = Expression::Ident(Identifier {
                 token: mem::take(&mut self.cur_token),
                 value: literal,
-            };
+            });
             identifiers.push(ident);
         }
 
@@ -829,15 +829,17 @@ mod tests {
                     Expected::Str("y".to_string()),
                 );
 
-                test_statements_len(if_expr.consequence.statements.len(), 1);
-                test_node_type(
-                    if_expr.consequence.statements[0].node_type(),
-                    NodeType::ExpressionStatement,
-                );
+                if let Statement::Block(block_stmt) = &if_expr.consequence {
+                    test_statements_len(block_stmt.statements.len(), 1);
+                    test_node_type(
+                        block_stmt.statements[0].node_type(),
+                        NodeType::ExpressionStatement,
+                    );
 
-                if let Statement::Expression(consq) = &if_expr.consequence.statements[0] {
-                    test_node_type(consq.expression.node_type(), NodeType::Identifier);
-                    test_identifier(&consq.expression, "x");
+                    if let Statement::Expression(consq) = &block_stmt.statements[0] {
+                        test_node_type(consq.expression.node_type(), NodeType::Identifier);
+                        test_identifier(&consq.expression, "x");
+                    }
                 }
 
                 assert!(
@@ -873,31 +875,35 @@ mod tests {
                     Expected::Str("y".to_string()),
                 );
 
-                test_statements_len(if_expr.consequence.statements.len(), 1);
-                test_node_type(
-                    if_expr.consequence.statements[0].node_type(),
-                    NodeType::ExpressionStatement,
-                );
+                if let Statement::Block(block) = &if_expr.consequence {
+                    test_statements_len(block.statements.len(), 1);
+                    test_node_type(
+                        block.statements[0].node_type(),
+                        NodeType::ExpressionStatement,
+                    );
 
-                if let Statement::Expression(consq) = &if_expr.consequence.statements[0] {
-                    test_node_type(consq.expression.node_type(), NodeType::Identifier);
-                    test_identifier(&consq.expression, "x");
+                    if let Statement::Expression(consq) = &block.statements[0] {
+                        test_node_type(consq.expression.node_type(), NodeType::Identifier);
+                        test_identifier(&consq.expression, "x");
+                    }
                 }
 
                 assert!(
                     if_expr.alternative.is_some(),
                     "if_expr.alternative is not Some. got=None"
                 );
-                let alternative = if_expr.alternative.as_ref().unwrap();
-                test_statements_len(alternative.statements.len(), 1);
-                test_node_type(
-                    alternative.statements[0].node_type(),
-                    NodeType::ExpressionStatement,
-                );
 
-                if let Statement::Expression(alt) = &alternative.statements[0] {
-                    test_node_type(alt.expression.node_type(), NodeType::Identifier);
-                    test_identifier(&alt.expression, "y");
+                if let Statement::Block(alternative) = if_expr.alternative.as_ref().unwrap() {
+                    test_statements_len(alternative.statements.len(), 1);
+                    test_node_type(
+                        alternative.statements[0].node_type(),
+                        NodeType::ExpressionStatement,
+                    );
+
+                    if let Statement::Expression(alt) = &alternative.statements[0] {
+                        test_node_type(alt.expression.node_type(), NodeType::Identifier);
+                        test_identifier(&alt.expression, "y");
+                    }
                 }
             }
         }
@@ -926,19 +932,21 @@ mod tests {
                 assert_eq!(func.parameters[0].token_literal(), "x");
                 assert_eq!(func.parameters[1].token_literal(), "y");
 
-                test_statements_len(func.body.statements.len(), 1);
-                test_node_type(
-                    func.body.statements[0].node_type(),
-                    NodeType::ExpressionStatement,
-                );
-
-                if let Statement::Expression(expr) = &func.body.statements[0] {
-                    test_infix_expression(
-                        &expr.expression,
-                        Expected::Str("x".to_string()),
-                        "+",
-                        Expected::Str("y".to_string()),
+                if let Statement::Block(block) = &*func.body {
+                    test_statements_len(block.statements.len(), 1);
+                    test_node_type(
+                        block.statements[0].node_type(),
+                        NodeType::ExpressionStatement,
                     );
+
+                    if let Statement::Expression(expr) = &block.statements[0] {
+                        test_infix_expression(
+                            &expr.expression,
+                            Expected::Str("x".to_string()),
+                            "+",
+                            Expected::Str("y".to_string()),
+                        );
+                    }
                 }
             }
         }
@@ -1293,19 +1301,21 @@ mod tests {
     fn test_let_statement(stmt: &Statement, name: &str, value: Expected) {
         test_node_type(stmt.node_type(), NodeType::Let);
         if let Statement::Let(let_stmt) = stmt {
-            assert_eq!(
-                let_stmt.name.value, name,
-                "let_stmt.name.value not {}. got={}",
-                name, let_stmt.name.value
-            );
+            if let Expression::Ident(ident) = &let_stmt.name {
+                assert_eq!(
+                    ident.value, name,
+                    "let_stmt.name.value not {}. got={}",
+                    name, ident.value
+                );
 
-            assert_eq!(
-                let_stmt.name.token_literal(),
-                name,
-                "let_stmt.name.token_literal() not {} got={}",
-                name,
-                let_stmt.name.token_literal()
-            );
+                assert_eq!(
+                    ident.token_literal(),
+                    name,
+                    "let_stmt.name.token_literal() not {} got={}",
+                    name,
+                    ident.token_literal()
+                );
+            }
 
             test_literal_expression(&let_stmt.value, value);
         }

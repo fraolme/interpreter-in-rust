@@ -198,7 +198,7 @@ impl fmt::Display for Program {
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct LetStatement {
     pub token: Token,
-    pub name: Identifier,
+    pub name: Expression, // identifier type
     pub value: Expression,
 }
 
@@ -388,8 +388,8 @@ impl fmt::Display for BooleanLiteral {
 pub struct IfExpression {
     pub token: Token, // if token
     pub condition: Box<Expression>,
-    pub consequence: BlockStatement,
-    pub alternative: Option<BlockStatement>,
+    pub consequence: Statement, // block statement type
+    pub alternative: Option<Statement>,
 }
 
 impl Node for IfExpression {
@@ -443,9 +443,9 @@ impl fmt::Display for BlockStatement {
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct FunctionLiteral {
-    pub token: Token, // fn token
-    pub parameters: Vec<Identifier>,
-    pub body: BlockStatement,
+    pub token: Token,                // fn token
+    pub parameters: Vec<Expression>, // identifier type
+    pub body: Box<Statement>,        // block statement type
 }
 
 impl Node for FunctionLiteral {

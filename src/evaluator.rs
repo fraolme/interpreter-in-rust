@@ -2,6 +2,7 @@ use crate::ast::*;
 use crate::builtins;
 use crate::environment::Environment;
 use crate::object::{FunctionObject, Object};
+use crate::token::{Token, TokenType};
 use std::collections::HashMap;
 
 pub struct Evaluator {
@@ -52,7 +53,9 @@ impl Evaluator {
                 if let Object::Error(_) = val {
                     return val;
                 }
-                env.set(&let_stmt.name.value, val);
+                if let Expression::Ident(ident) = &let_stmt.name {
+                    env.set(&ident.value, val);
+                }
                 return Object::Null;
             }
         }
@@ -85,10 +88,14 @@ impl Evaluator {
             Expression::Ident(ident) => self.eval_identifier(ident, env),
             Expression::Func(func_lit) => Object::Function(FunctionObject {
                 parameters: func_lit.parameters,
-                body: func_lit.body,
+                body: *func_lit.body,
                 env: env.clone(),
             }),
-            Expression::Call(call_expr) => {
+            Expression::Call(mut call_expr) => {
+                if call_expr.function.token_literal() == "quote" {
+                    return self.quote(call_expr.arguments.remove(0), env);
+                }
+
                 let function = self.eval_expression(*call_expr.function, env);
                 if let Object::Error(_) = function {
                     function
@@ -233,9 +240,9 @@ impl Evaluator {
         };
 
         if cond_val {
-            return self.eval_statement(Statement::Block(if_expr.consequence), env);
+            return self.eval_statement(if_expr.consequence, env);
         } else if if_expr.alternative.is_some() {
-            return self.eval_statement(Statement::Block(if_expr.alternative.unwrap()), env);
+            return self.eval_statement(if_expr.alternative.unwrap(), env);
         } else {
             return Object::Null;
         }
@@ -299,7 +306,7 @@ impl Evaluator {
                     ));
                 }
                 let mut extended_env = self.extend_function_env(parameters, args, env);
-                let evaluated = self.eval_statement(Statement::Block(body), &mut extended_env);
+                let evaluated = self.eval_statement(body, &mut extended_env);
                 if let Object::ReturnValue(wrapped_obj) = evaluated {
                     *wrapped_obj
                 } else {
@@ -313,14 +320,16 @@ impl Evaluator {
 
     fn extend_function_env(
         &self,
-        parameters: Vec<Identifier>,
+        parameters: Vec<Expression>,
         args: Vec<Object>,
         env: Environment,
     ) -> Environment {
         let mut env = Environment::new_enclosed(env);
 
         for i in 0..parameters.len() {
-            env.set(&parameters[i].value, args[i].clone());
+            if let Expression::Ident(ident) = &parameters[i] {
+                env.set(&ident.value, args[i].clone());
+            }
         }
 
         env
@@ -401,6 +410,162 @@ impl Evaluator {
                 "This type can't be used as a key for a hashmap, got={}",
                 key.get_type()
             ));
+        }
+    }
+
+    fn quote(&self, node: Expression, env: &mut Environment) -> Object {
+        let node = self.eval_unquote_calls_expr(node, env);
+        Object::Quote(node)
+    }
+
+    fn eval_unquote_calls_expr(&self, expr: Expression, env: &mut Environment) -> Expression {
+        match expr {
+            Expression::Infix(mut infix_expr) => {
+                *infix_expr.left = self.eval_unquote_calls_expr(*infix_expr.left, env);
+                *infix_expr.right = self.eval_unquote_calls_expr(*infix_expr.right, env);
+                return Expression::Infix(infix_expr);
+            }
+            Expression::Prefix(mut prefix_expr) => {
+                *prefix_expr.right = self.eval_unquote_calls_expr(*prefix_expr.right, env);
+                return Expression::Prefix(prefix_expr);
+            }
+            Expression::Index(mut index_expr) => {
+                *index_expr.left = self.eval_unquote_calls_expr(*index_expr.left, env);
+                *index_expr.index = self.eval_unquote_calls_expr(*index_expr.index, env);
+                return Expression::Index(index_expr);
+            }
+            Expression::If(mut if_expr) => {
+                *if_expr.condition = self.eval_unquote_calls_expr(*if_expr.condition, env);
+                if_expr.consequence = self.eval_unquote_calls_stmt(if_expr.consequence, env);
+                if if_expr.alternative.is_some() {
+                    if_expr.alternative =
+                        Some(self.eval_unquote_calls_stmt(if_expr.alternative.unwrap(), env));
+                }
+                return Expression::If(if_expr);
+            }
+            Expression::Func(mut func_lit) => {
+                for i in 0..func_lit.parameters.len() {
+                    func_lit.parameters[i] =
+                        self.eval_unquote_calls_expr(func_lit.parameters[i].clone(), env);
+                }
+                func_lit.body = Box::new(self.eval_unquote_calls_stmt(*func_lit.body, env));
+                return Expression::Func(func_lit);
+            }
+            Expression::Array(mut arr_lit) => {
+                for i in 0..arr_lit.elements.len() {
+                    arr_lit.elements[i] =
+                        self.eval_unquote_calls_expr(arr_lit.elements[i].clone(), env);
+                }
+                return Expression::Array(arr_lit);
+            }
+            Expression::Hash(mut hash_lit) => {
+                let mut map = HashMap::new();
+                for (key, value) in hash_lit.pairs {
+                    let new_key = self.eval_unquote_calls_expr(key.clone(), env);
+                    let new_value = self.eval_unquote_calls_expr(value.clone(), env);
+                    map.insert(new_key, new_value);
+                }
+                hash_lit.pairs = map;
+                return Expression::Hash(hash_lit);
+            }
+            Expression::Call(mut call_expr) => {
+                if call_expr.function.token_literal() == "unquote" && call_expr.arguments.len() == 1
+                {
+                    let unquoted = self.eval_expression(call_expr.arguments.remove(0), env);
+                    return self.convert_object_to_ast_node(unquoted);
+                } else {
+                    return Expression::Call(call_expr);
+                }
+            }
+            _ => {
+                return expr;
+            }
+        }
+    }
+
+    fn eval_unquote_calls_stmt(&self, stmt: Statement, env: &mut Environment) -> Statement {
+        match stmt {
+            Statement::Expression(mut expr_stmt) => {
+                expr_stmt.expression =
+                    self.eval_unquote_calls_expr(expr_stmt.expression.clone(), env);
+                return Statement::Expression(expr_stmt);
+            }
+            Statement::Block(mut block_stmt) => {
+                for i in 0..block_stmt.statements.len() {
+                    block_stmt.statements[i] =
+                        self.eval_unquote_calls_stmt(block_stmt.statements[i].clone(), env);
+                }
+                return Statement::Block(block_stmt);
+            }
+            Statement::Return(mut ret_stmt) => {
+                ret_stmt.return_value =
+                    self.eval_unquote_calls_expr(ret_stmt.return_value.clone(), env);
+                return Statement::Return(ret_stmt);
+            }
+            Statement::Let(mut let_stmt) => {
+                let_stmt.value = self.eval_unquote_calls_expr(let_stmt.value, env);
+                return Statement::Let(let_stmt);
+            }
+        }
+    }
+
+    fn convert_object_to_ast_node(&self, unquoted: Object) -> Expression {
+        match unquoted {
+            Object::Integer(intv) => Expression::Int(IntegerLiteral {
+                token: Token {
+                    token_type: TokenType::Int,
+                    literal: format!("{}", intv),
+                },
+                value: intv,
+            }),
+            Object::Boolean(bv) => Expression::Boolean(BooleanLiteral {
+                token: Token {
+                    token_type: if bv {
+                        TokenType::True
+                    } else {
+                        TokenType::False
+                    },
+                    literal: format!("{}", bv),
+                },
+                value: bv,
+            }),
+            Object::String(sv) => Expression::String(StringLiteral {
+                token: Token {
+                    token_type: TokenType::String,
+                    literal: format!("{}", sv),
+                },
+                value: format!("{}", sv),
+            }),
+            Object::Array(arr) => {
+                let mut exp_arr = vec![];
+                for item in arr {
+                    exp_arr.push(self.convert_object_to_ast_node(item));
+                }
+                Expression::Array(ArrayLiteral {
+                    token: Token {
+                        token_type: TokenType::Lbracket,
+                        literal: "[".to_string(),
+                    },
+                    elements: exp_arr,
+                })
+            }
+            Object::Hash(hash) => {
+                let mut exp_hash: HashMap<Expression, Expression> = HashMap::new();
+                for (key, value) in hash {
+                    let new_key = self.convert_object_to_ast_node(key);
+                    let new_value = self.convert_object_to_ast_node(value);
+                    exp_hash.insert(new_key, new_value);
+                }
+                Expression::Hash(HashLiteral {
+                    token: Token {
+                        token_type: TokenType::Lbrace,
+                        literal: "{".to_string(),
+                    },
+                    pairs: exp_hash,
+                })
+            }
+            Object::Quote(exp) => exp,
+            _ => panic!("Inavlid Unquoted value. got={}", unquoted),
         }
     }
 }
@@ -805,6 +970,7 @@ mod test {
         }
     }
 
+    #[test]
     fn test_hash_index_expression() {
         let tests = vec![
             (r#"{"foo": 5}["foo"]"#, Expected::Int64(5)),
@@ -822,6 +988,68 @@ mod test {
                 Expected::Int64(val) => test_integer_object(evaluated, val),
                 Expected::Null => test_null_object(evaluated),
                 _ => panic!("unexpected value"),
+            }
+        }
+    }
+
+    #[test]
+    fn test_quote() {
+        let tests = vec![
+            ("quote(5)", "5"),
+            ("quote(6 + 8)", "(6 + 8)"),
+            ("quote(foobar)", "foobar"),
+            ("quote(foobar + barfoo)", "(foobar + barfoo)"),
+        ];
+
+        for (input, expected) in tests {
+            let evaluated = test_eval(input);
+            if let Object::Quote(expr) = evaluated {
+                assert_eq!(
+                    expr.to_string(),
+                    expected,
+                    "not equal. got={}, want={}",
+                    expr.to_string(),
+                    expected
+                );
+            } else {
+                panic!("expected object::Quote. got={}", evaluated);
+            }
+        }
+    }
+
+    #[test]
+    fn test_quote_unquote() {
+        let tests = vec![
+            ("quote(unquote(4))", "4"),
+            ("quote(unquote(4 + 4))", "8"),
+            ("quote(8 + unquote(4 + 4))", "(8 + 8)"),
+            ("quote(unquote(4 + 4) + 8)", "(8 + 8)"),
+            ("let foobar = 8; quote(foobar)", "foobar"),
+            ("let foobar = 8; quote(unquote(foobar))", "8"),
+            ("quote(unquote(true))", "true"),
+            ("quote(unquote(true == false))", "false"),
+            ("quote(unquote(quote(4 + 4)))", "(4 + 4)"),
+            (
+                r#"
+                let quotedInfixExpression = quote(4 + 4);
+                quote(unquote(4 + 4) + unquote(quotedInfixExpression))
+            "#,
+                "(8 + (4 + 4))",
+            ),
+        ];
+
+        for (input, expected) in tests {
+            let evaluated = test_eval(input);
+            if let Object::Quote(expr) = evaluated {
+                assert_eq!(
+                    expr.to_string(),
+                    expected,
+                    "not equal. got={}, want={}",
+                    expr.to_string(),
+                    expected
+                );
+            } else {
+                panic!("expected object::Quote. got={}", evaluated);
             }
         }
     }
