@@ -17,6 +17,7 @@ pub enum Object {
     Array(Vec<Object>),
     Hash(HashMap<Object, Object>),
     Quote(Expression),
+    Macro(MacroObject),
 }
 
 impl Object {
@@ -37,6 +38,7 @@ impl Object {
             Object::Array(_) => "ARRAY",
             Object::Hash(_) => "HASH",
             Object::Quote(_) => "QUOTE",
+            Object::Macro(_) => "MACRO",
         }
     }
 }
@@ -69,6 +71,7 @@ impl fmt::Display for Object {
                     .join(", ")
             ),
             Object::Quote(exp) => write!(f, "QUOTE({})", exp),
+            Object::Macro(mac) => write!(f, "{}", mac),
         }
     }
 }
@@ -111,6 +114,28 @@ impl fmt::Display for FunctionObject {
 }
 
 type BuiltinFunction = fn(Vec<Object>) -> Object;
+
+#[derive(Clone, PartialEq, Eq)]
+pub struct MacroObject {
+    pub parameters: Vec<Expression>,
+    pub body: Statement,
+    pub env: Environment,
+}
+
+impl fmt::Display for MacroObject {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "macro ({}) {{\n {} \n}}",
+            self.parameters
+                .iter()
+                .map(|p| p.to_string())
+                .collect::<Vec<String>>()
+                .join(", "),
+            self.body
+        )
+    }
+}
 
 #[cfg(test)]
 mod tests {

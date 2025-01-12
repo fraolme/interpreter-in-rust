@@ -28,6 +28,7 @@ pub enum NodeType {
     ArrayLiteral,
     IndexExpression,
     HashLiteral,
+    MacroLiteral,
 }
 
 impl fmt::Display for NodeType {
@@ -50,6 +51,7 @@ impl fmt::Display for NodeType {
             NodeType::ArrayLiteral => "array",
             NodeType::IndexExpression => "index",
             NodeType::HashLiteral => "hash",
+            NodeType::MacroLiteral => "macro",
         };
 
         write!(f, "{}", val)
@@ -109,6 +111,7 @@ pub enum Expression {
     Array(ArrayLiteral),
     Index(Box<IndexExpression>),
     Hash(HashLiteral),
+    Macro(MacroLiteral),
 }
 
 impl Node for Expression {
@@ -126,6 +129,7 @@ impl Node for Expression {
             Expression::Array(arr) => arr.token_literal(),
             Expression::Index(index) => index.token_literal(),
             Expression::Hash(hash) => hash.token_literal(),
+            Expression::Macro(mac) => mac.token_literal(),
         }
     }
 
@@ -143,6 +147,7 @@ impl Node for Expression {
             Expression::Array(arr) => arr.node_type(),
             Expression::Index(index) => index.node_type(),
             Expression::Hash(hash) => hash.node_type(),
+            Expression::Macro(mac) => mac.node_type(),
         }
     }
 }
@@ -162,6 +167,7 @@ impl fmt::Display for Expression {
             Expression::Array(arr) => write!(f, "{}", arr),
             Expression::Index(index) => write!(f, "{}", index),
             Expression::Hash(hash) => write!(f, "{}", hash),
+            Expression::Macro(mac) => write!(f, "{}", mac),
         }
     }
 }
@@ -609,5 +615,37 @@ impl fmt::Display for HashLiteral {
 impl Hash for HashLiteral {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.token.hash(state);
+    }
+}
+
+#[derive(Hash, PartialEq, Eq, Clone)]
+pub struct MacroLiteral {
+    pub token: Token,                // macro
+    pub parameters: Vec<Expression>, // identifiers
+    pub body: Box<Statement>,
+}
+
+impl Node for MacroLiteral {
+    fn token_literal(&self) -> &str {
+        &self.token.literal
+    }
+
+    fn node_type(&self) -> NodeType {
+        NodeType::MacroLiteral
+    }
+}
+
+impl fmt::Display for MacroLiteral {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "macro ({}) {{ {} }}",
+            self.parameters
+                .iter()
+                .map(|p| p.to_string())
+                .collect::<Vec<String>>()
+                .join(", "),
+            self.body
+        )
     }
 }

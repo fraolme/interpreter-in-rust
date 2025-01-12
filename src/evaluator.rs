@@ -1,7 +1,7 @@
 use crate::ast::*;
 use crate::builtins;
 use crate::environment::Environment;
-use crate::object::{FunctionObject, Object};
+use crate::object::{FunctionObject, MacroObject, Object};
 use crate::token::{Token, TokenType};
 use std::collections::HashMap;
 
@@ -132,6 +132,7 @@ impl Evaluator {
                 self.eval_index_expression(left, index)
             }
             Expression::Hash(hash) => self.eval_hash_literal(hash, env),
+            Expression::Macro(_) => panic!("Unsupported expression type"),
         }
     }
 
@@ -567,6 +568,197 @@ impl Evaluator {
             Object::Quote(exp) => exp,
             _ => panic!("Inavlid Unquoted value. got={}", unquoted),
         }
+    }
+
+    pub fn define_macros(&self, program: &mut Program, env: &mut Environment) {
+        let mut definitions: Vec<usize> = vec![];
+
+        for i in 0..program.statements.len() {
+            if self.is_macro_definition(&program.statements[i]) {
+                self.add_macro(&program.statements[i], env);
+                definitions.push(i);
+            }
+        }
+
+        program.statements = program
+            .statements
+            .iter()
+            .enumerate()
+            .filter(|(index, _)| !definitions.contains(index))
+            .map(|(_, stmt)| stmt.clone())
+            .collect::<Vec<Statement>>();
+    }
+
+    fn is_macro_definition(&self, statement: &Statement) -> bool {
+        if let Statement::Let(let_stmt) = statement {
+            if let Expression::Macro(_) = &let_stmt.value {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    fn add_macro(&self, statement: &Statement, env: &mut Environment) {
+        if let Statement::Let(stmt) = statement {
+            if let Expression::Macro(mac) = &stmt.value {
+                let mac_obj = Object::Macro(MacroObject {
+                    parameters: mac.parameters.clone(),
+                    env: env.clone(),
+                    body: *mac.body.clone(),
+                });
+
+                if let Expression::Ident(ident) = &stmt.name {
+                    env.set(&ident.value, mac_obj);
+                }
+            }
+        }
+    }
+
+    pub fn expand_macros(&self, mut program: Program, env: &mut Environment) -> Program {
+        for i in 0..program.statements.len() {
+            program.statements[i] = self.expand_macro_stmt(program.statements[i].clone(), env);
+        }
+
+        return program;
+    }
+
+    fn expand_macro_expr(&self, expr: Expression, env: &mut Environment) -> Expression {
+        match expr {
+            Expression::Infix(mut infix_expr) => {
+                *infix_expr.left = self.expand_macro_expr(*infix_expr.left, env);
+                *infix_expr.right = self.expand_macro_expr(*infix_expr.right, env);
+                return Expression::Infix(infix_expr);
+            }
+            Expression::Prefix(mut prefix_expr) => {
+                *prefix_expr.right = self.expand_macro_expr(*prefix_expr.right, env);
+                return Expression::Prefix(prefix_expr);
+            }
+            Expression::Index(mut index_expr) => {
+                *index_expr.left = self.expand_macro_expr(*index_expr.left, env);
+                *index_expr.index = self.expand_macro_expr(*index_expr.index, env);
+                return Expression::Index(index_expr);
+            }
+            Expression::If(mut if_expr) => {
+                *if_expr.condition = self.expand_macro_expr(*if_expr.condition, env);
+                if_expr.consequence = self.expand_macro_stmt(if_expr.consequence, env);
+                if if_expr.alternative.is_some() {
+                    if_expr.alternative =
+                        Some(self.expand_macro_stmt(if_expr.alternative.unwrap(), env));
+                }
+                return Expression::If(if_expr);
+            }
+            Expression::Func(mut func_lit) => {
+                for i in 0..func_lit.parameters.len() {
+                    func_lit.parameters[i] =
+                        self.expand_macro_expr(func_lit.parameters[i].clone(), env);
+                }
+                func_lit.body = Box::new(self.expand_macro_stmt(*func_lit.body, env));
+                return Expression::Func(func_lit);
+            }
+            Expression::Array(mut arr_lit) => {
+                for i in 0..arr_lit.elements.len() {
+                    arr_lit.elements[i] = self.expand_macro_expr(arr_lit.elements[i].clone(), env);
+                }
+                return Expression::Array(arr_lit);
+            }
+            Expression::Hash(mut hash_lit) => {
+                let mut map = HashMap::new();
+                for (key, value) in hash_lit.pairs {
+                    let new_key = self.expand_macro_expr(key.clone(), env);
+                    let new_value = self.expand_macro_expr(value.clone(), env);
+                    map.insert(new_key, new_value);
+                }
+                hash_lit.pairs = map;
+                return Expression::Hash(hash_lit);
+            }
+            Expression::Call(call_expr) => {
+                let mac = self.is_macro_call(&call_expr, env);
+                if mac.is_some() {
+                    let args = self.quote_args(*call_expr);
+                    let MacroObject {
+                        parameters,
+                        body,
+                        env,
+                    } = mac.unwrap();
+                    let mut eval_env = self.extend_macro_env(parameters, env, args);
+                    let evaluated = self.eval_statement(body, &mut eval_env);
+                    if let Object::Quote(node) = evaluated {
+                        return node;
+                    } else {
+                        panic!("we only support returning AST nodes from macros");
+                    }
+                }
+
+                return Expression::Call(call_expr);
+            }
+            _ => {
+                return expr;
+            }
+        }
+    }
+
+    fn expand_macro_stmt(&self, stmt: Statement, env: &mut Environment) -> Statement {
+        match stmt {
+            Statement::Expression(mut expr_stmt) => {
+                expr_stmt.expression = self.expand_macro_expr(expr_stmt.expression.clone(), env);
+                return Statement::Expression(expr_stmt);
+            }
+            Statement::Block(mut block_stmt) => {
+                for i in 0..block_stmt.statements.len() {
+                    block_stmt.statements[i] =
+                        self.expand_macro_stmt(block_stmt.statements[i].clone(), env);
+                }
+                return Statement::Block(block_stmt);
+            }
+            Statement::Return(mut ret_stmt) => {
+                ret_stmt.return_value = self.expand_macro_expr(ret_stmt.return_value.clone(), env);
+                return Statement::Return(ret_stmt);
+            }
+            Statement::Let(mut let_stmt) => {
+                let_stmt.value = self.expand_macro_expr(let_stmt.value, env);
+                return Statement::Let(let_stmt);
+            }
+        }
+    }
+
+    fn is_macro_call(&self, call_expr: &CallExpression, env: &Environment) -> Option<MacroObject> {
+        if let Expression::Ident(ident) = &*call_expr.function {
+            let obj = env.get(&ident.value);
+            if obj.is_some() {
+                if let Object::Macro(mac) = obj.unwrap() {
+                    return Some(mac.clone());
+                }
+            }
+        }
+
+        return None;
+    }
+
+    fn quote_args(&self, exp: CallExpression) -> Vec<Object> {
+        let mut args = vec![];
+
+        for arg in exp.arguments {
+            args.push(Object::Quote(arg));
+        }
+
+        args
+    }
+
+    fn extend_macro_env(
+        &self,
+        parameters: Vec<Expression>,
+        env: Environment,
+        args: Vec<Object>,
+    ) -> Environment {
+        let mut extended = Environment::new_enclosed(env);
+        for (index, param) in parameters.iter().enumerate() {
+            if let Expression::Ident(ident) = &param {
+                extended.set(&ident.value, args[index].clone());
+            }
+        }
+
+        extended
     }
 }
 
@@ -1054,7 +1246,120 @@ mod test {
         }
     }
 
+    #[test]
+    fn test_define_macros() {
+        let input = r#"
+            let number = 1;
+            let function = fn(x, y) { x + y };
+            let mymacro = macro(x, y) { x + y };
+        "#;
+
+        let mut env = Environment::new();
+        let mut program = test_parse_program(input);
+        let evaluator = Evaluator::new();
+        evaluator.define_macros(&mut program, &mut env);
+
+        assert_eq!(
+            program.statements.len(),
+            2,
+            "Wrong number of staements. got={}",
+            program.statements.len()
+        );
+
+        assert!(env.get("number").is_none(), "number should not be defines");
+        assert!(
+            env.get("function").is_none(),
+            "function should not be defines"
+        );
+        assert!(env.get("mymacro").is_some(), "mymacro not in environment");
+
+        let obj = env.get("mymacro").unwrap().clone();
+        if let Object::Macro(obj_macro) = &obj {
+            assert_eq!(
+                obj_macro.parameters.len(),
+                2,
+                "wrong number of macro parameters. got={}",
+                obj_macro.parameters.len()
+            );
+            assert_eq!(
+                obj_macro.parameters[0].to_string(),
+                "x",
+                "parameter is not 'x'. got={}",
+                obj_macro.parameters[0]
+            );
+            assert_eq!(
+                obj_macro.parameters[1].to_string(),
+                "y",
+                "parameter is not 'y'. got={}",
+                obj_macro.parameters[1]
+            );
+            assert_eq!(
+                obj_macro.body.to_string(),
+                "(x + y)",
+                "body is not (x + y). got={}",
+                obj_macro.body
+            );
+        } else {
+            panic!("The object is not a macro object");
+        }
+    }
+
+    #[test]
+    fn test_expand_macros() {
+        let tests = vec![
+            (
+                r#"
+                let infixExpression = macro() { quote(1 + 2); };
+                infixExpression();
+            "#,
+                "(1 + 2)",
+            ),
+            (
+                r#"
+                let reverse = macro(a, b) { quote(unquote(b) - unquote(a)); };
+                reverse(2 + 2, 10 - 5);
+            "#,
+                "(10 - 5) - (2 + 2)",
+            ),
+            (
+                r#"
+                let unless = macro(condition, consequence, alternative) {
+                    quote(if(!(unquote(condition))) {
+                        unquote(consequence);
+                    } else {
+                        unquote(alternative);
+                    });
+                };
+                unless(10 > 5, puts("not greater"), puts("greater"));
+            "#,
+                r#"if (!(10 > 5)) { puts("not greater") } else { puts("greater") }"#,
+            ),
+        ];
+
+        for (input, exp) in tests {
+            let expected = test_parse_program(exp);
+            let mut program = test_parse_program(input);
+            let mut env = Environment::new();
+            let eval = Evaluator::new();
+            eval.define_macros(&mut program, &mut env);
+            let expanded = eval.expand_macros(program, &mut env);
+            assert_eq!(
+                expanded.to_string(),
+                expected.to_string(),
+                "Not equal. want={}, got={}",
+                expected.to_string(),
+                expanded.to_string()
+            );
+        }
+    }
+
     // helpers
+    fn test_parse_program(input: &str) -> Program {
+        let lexer = Lexer::new(input.to_string());
+        let mut parser = Parser::new(lexer);
+        return parser.parse_program();
+    }
+
     fn test_eval(input: &str) -> Object {
         let lexer = Lexer::new(input.to_string());
         let mut parser = Parser::new(lexer);

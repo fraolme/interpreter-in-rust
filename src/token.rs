@@ -51,6 +51,7 @@ pub enum TokenType {
     If,
     Else,
     Return,
+    Macro,
 }
 
 impl TokenType {
@@ -63,6 +64,7 @@ impl TokenType {
             "if" => TokenType::If,
             "else" => TokenType::Else,
             "return" => TokenType::Return,
+            "macro" => TokenType::Macro,
             _ => TokenType::Ident,
         }
     }
@@ -102,6 +104,7 @@ impl fmt::Display for TokenType {
             TokenType::If => "if",
             TokenType::Else => "else",
             TokenType::Return => "return",
+            TokenType::Macro => "macro",
         };
 
         write!(f, "{}", str_val)

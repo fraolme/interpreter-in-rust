@@ -192,6 +192,7 @@ mod tests {
           ""
           [1, 2];
           {"foo": "bar"}
+          macro(x, y) {x + y; };
         "#,
         );
 
@@ -283,6 +284,19 @@ mod tests {
             (TokenType::Colon, ":"),
             (TokenType::String, "bar"),
             (TokenType::Rbrace, "}"),
+            (TokenType::Macro, "macro"),
+            (TokenType::Lparen, "("),
+            (TokenType::Ident, "x"),
+            (TokenType::Comma, ","),
+            (TokenType::Ident, "y"),
+            (TokenType::Rparen, ")"),
+            (TokenType::Lbrace, "{"),
+            (TokenType::Ident, "x"),
+            (TokenType::Plus, "+"),
+            (TokenType::Ident, "y"),
+            (TokenType::SemiColon, ";"),
+            (TokenType::Rbrace, "}"),
+            (TokenType::SemiColon, ";"),
             (TokenType::Eof, ""),
         ];
 

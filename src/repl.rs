@@ -9,6 +9,7 @@ const PROMPT: &str = ">> ";
 
 pub fn start(stdin: Stdin) {
     let mut env = Environment::new();
+    let mut macro_env = Environment::new();
 
     loop {
         let mut buffer = String::new();
@@ -21,7 +22,7 @@ pub fn start(stdin: Stdin) {
 
         let lexer = Lexer::new(buffer);
         let mut parser = Parser::new(lexer);
-        let program = parser.parse_program();
+        let mut program = parser.parse_program();
         if parser.errors.len() != 0 {
             println!(
                 "Whoops parser errors:\n {}",
@@ -36,7 +37,9 @@ pub fn start(stdin: Stdin) {
         }
 
         let evaluator = Evaluator::new();
-        let evaluated = evaluator.eval(program, &mut env);
+        evaluator.define_macros(&mut program, &mut macro_env);
+        let expanded_program = evaluator.expand_macros(program, &mut macro_env);
+        let evaluated = evaluator.eval(expanded_program, &mut env);
         match evaluated {
             Object::Null => continue,
             _ => println!("{}", evaluated.inspect()),

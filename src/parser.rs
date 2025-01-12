@@ -58,6 +58,7 @@ impl Parser {
         prefix_parse_fns.insert(TokenType::String, Parser::parse_string_literal);
         prefix_parse_fns.insert(TokenType::Lbracket, Parser::parse_array_literal);
         prefix_parse_fns.insert(TokenType::Lbrace, Parser::parse_hash_literal);
+        prefix_parse_fns.insert(TokenType::Macro, Parser::parse_macro_literal);
 
         let mut infix_parse_fns: HashMap<TokenType, InfixParseFn> = HashMap::new();
         infix_parse_fns.insert(TokenType::Plus, Parser::parse_infix_expression);
@@ -447,6 +448,25 @@ impl Parser {
         Some(Expression::Hash(HashLiteral {
             token: cur_token,
             pairs: map,
+        }))
+    }
+
+    fn parse_macro_literal(&mut self) -> Option<Expression> {
+        let cur_token = mem::take(&mut self.cur_token);
+        if !self.expect_peek(TokenType::Lparen) {
+            return None;
+        }
+        let parameters = self.parse_expression_list(TokenType::Rparen)?;
+
+        if !self.expect_peek(TokenType::Lbrace) {
+            return None;
+        }
+        let body = self.parse_block_statement();
+
+        Some(Expression::Macro(MacroLiteral {
+            token: cur_token,
+            parameters,
+            body: Box::new(body),
         }))
     }
 
@@ -1183,6 +1203,56 @@ mod tests {
                         test_func(&value);
                     } else {
                         panic!("key is not ast::StringLiteral. got={}", key);
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_macro_literal_parsing() {
+        let input = "macro(x, y) { x + y; }";
+        let lexer = Lexer::new(input.to_string());
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse_program();
+        check_parser_errors(&parser);
+
+        test_statements_len(program.statements.len(), 1);
+
+        test_node_type(
+            program.statements[0].node_type(),
+            NodeType::ExpressionStatement,
+        );
+
+        if let Statement::Expression(stmt) = &program.statements[0] {
+            test_node_type(stmt.expression.node_type(), NodeType::MacroLiteral);
+
+            if let Expression::Macro(lit) = &stmt.expression {
+                assert_eq!(
+                    lit.parameters.len(),
+                    2,
+                    "macro literal parameters wrong. want=2, got={}",
+                    lit.parameters.len()
+                );
+
+                test_literal_expression(&lit.parameters[0], Expected::Str("x".to_string()));
+                test_literal_expression(&lit.parameters[1], Expected::Str("y".to_string()));
+
+                test_node_type(lit.body.node_type(), NodeType::BlockStatement);
+
+                if let Statement::Block(block) = &*lit.body {
+                    test_statements_len(block.statements.len(), 1);
+                    test_node_type(
+                        block.statements[0].node_type(),
+                        NodeType::ExpressionStatement,
+                    );
+                    if let Statement::Expression(body_stmt) = &block.statements[0] {
+                        test_infix_expression(
+                            &body_stmt.expression,
+                            Expected::Str("x".to_string()),
+                            "+",
+                            Expected::Str("y".to_string()),
+                        );
                     }
                 }
             }
