@@ -2,7 +2,7 @@ use crate::ast::*;
 use crate::builtins;
 use crate::environment::Environment;
 use crate::object::{FunctionObject, MacroObject, Object};
-use crate::token::{Token, TokenType};
+use crate::token::Token;
 use std::collections::HashMap;
 
 pub struct Evaluator {
@@ -513,28 +513,15 @@ impl Evaluator {
     fn convert_object_to_ast_node(&self, unquoted: Object) -> Expression {
         match unquoted {
             Object::Integer(intv) => Expression::Int(IntegerLiteral {
-                token: Token {
-                    token_type: TokenType::Int,
-                    literal: format!("{}", intv),
-                },
+                token: Token::Int(format!("{}", intv)),
                 value: intv,
             }),
             Object::Boolean(bv) => Expression::Boolean(BooleanLiteral {
-                token: Token {
-                    token_type: if bv {
-                        TokenType::True
-                    } else {
-                        TokenType::False
-                    },
-                    literal: format!("{}", bv),
-                },
+                token: if bv { Token::True } else { Token::False },
                 value: bv,
             }),
             Object::String(sv) => Expression::String(StringLiteral {
-                token: Token {
-                    token_type: TokenType::String,
-                    literal: format!("{}", sv),
-                },
+                token: Token::String(format!("{}", sv)),
                 value: format!("{}", sv),
             }),
             Object::Array(arr) => {
@@ -543,10 +530,7 @@ impl Evaluator {
                     exp_arr.push(self.convert_object_to_ast_node(item));
                 }
                 Expression::Array(ArrayLiteral {
-                    token: Token {
-                        token_type: TokenType::Lbracket,
-                        literal: "[".to_string(),
-                    },
+                    token: Token::Lbracket,
                     elements: exp_arr,
                 })
             }
@@ -558,10 +542,7 @@ impl Evaluator {
                     exp_hash.insert(new_key, new_value);
                 }
                 Expression::Hash(HashLiteral {
-                    token: Token {
-                        token_type: TokenType::Lbrace,
-                        literal: "{".to_string(),
-                    },
+                    token: Token::Lbrace,
                     pairs: exp_hash,
                 })
             }

@@ -1,28 +1,10 @@
-use std::fmt;
-
-//Default is useful when we use mem::take for ownership change
-#[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
-pub struct Token {
-    pub token_type: TokenType,
-    pub literal: String,
-}
-
-impl Token {
-    pub fn new(token_type: TokenType, ch: char) -> Self {
-        Self {
-            token_type,
-            literal: String::from(ch),
-        }
-    }
-}
-
-#[derive(Debug, PartialEq, Eq, Default, Copy, Clone, Hash)]
-pub enum TokenType {
-    Illegal,
+#[derive(Debug, PartialEq, Eq, Default, Clone, Hash)]
+pub enum Token {
+    Illegal(String),
     #[default]
-    Eof, // the default value of TokenType,
-    Ident, // identifier
-    Int,
+    Eof, // the default value of Token,
+    Ident(String), // identifier
+    Int(String),
     Assign,
     Plus,
     Minus,
@@ -39,7 +21,7 @@ pub enum TokenType {
     Rbrace,
     Eq,
     NotEq,
-    String,
+    String(String),
     Lbracket,
     Rbracket,
     Colon,
@@ -54,59 +36,94 @@ pub enum TokenType {
     Macro,
 }
 
-impl TokenType {
-    pub fn lookup_ident(ident: &str) -> TokenType {
+impl Token {
+    pub fn lookup_ident(ident: &str) -> Self {
         match ident {
-            "fn" => TokenType::Function,
-            "let" => TokenType::Let,
-            "true" => TokenType::True,
-            "false" => TokenType::False,
-            "if" => TokenType::If,
-            "else" => TokenType::Else,
-            "return" => TokenType::Return,
-            "macro" => TokenType::Macro,
-            _ => TokenType::Ident,
+            "fn" => Token::Function,
+            "let" => Token::Let,
+            "true" => Token::True,
+            "false" => Token::False,
+            "if" => Token::If,
+            "else" => Token::Else,
+            "return" => Token::Return,
+            "macro" => Token::Macro,
+            _ => Token::Ident(ident.to_string()),
         }
     }
-}
 
-impl fmt::Display for TokenType {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let str_val = match self {
-            TokenType::Illegal => "ILLEGAL",
-            TokenType::Eof => "EOF",
-            TokenType::Ident => "IDENT",
-            TokenType::Int => "INT",
-            TokenType::Assign => "=",
-            TokenType::Plus => "+",
-            TokenType::Minus => "-",
-            TokenType::Bang => "!",
-            TokenType::Asterisk => "*",
-            TokenType::Slash => "/",
-            TokenType::LessThan => "<",
-            TokenType::GreaterThan => ">",
-            TokenType::Comma => ",",
-            TokenType::SemiColon => ";",
-            TokenType::Lparen => "(",
-            TokenType::Rparen => ")",
-            TokenType::Lbrace => "{",
-            TokenType::Rbrace => "}",
-            TokenType::Eq => "==",
-            TokenType::NotEq => "!=",
-            TokenType::String => "STRING",
-            TokenType::Lbracket => "[",
-            TokenType::Rbracket => "]",
-            TokenType::Colon => ":",
-            TokenType::Function => "FUNCTION",
-            TokenType::Let => "LET",
-            TokenType::True => "true",
-            TokenType::False => "false",
-            TokenType::If => "if",
-            TokenType::Else => "else",
-            TokenType::Return => "return",
-            TokenType::Macro => "macro",
+    pub fn token_type(&self) -> String {
+        let token_type = match self {
+            Token::Illegal(_) => "ILLEGAL",
+            Token::Eof => "EOF",
+            Token::Ident(_) => "IDENT",
+            Token::Int(_) => "INT",
+            Token::Assign => "=",
+            Token::Plus => "+",
+            Token::Minus => "-",
+            Token::Bang => "!",
+            Token::Asterisk => "*",
+            Token::Slash => "/",
+            Token::LessThan => "<",
+            Token::GreaterThan => ">",
+            Token::Comma => ",",
+            Token::SemiColon => ";",
+            Token::Lparen => "(",
+            Token::Rparen => ")",
+            Token::Lbrace => "{",
+            Token::Rbrace => "}",
+            Token::Eq => "==",
+            Token::NotEq => "!=",
+            Token::String(_) => "STRING",
+            Token::Lbracket => "[",
+            Token::Rbracket => "]",
+            Token::Colon => ":",
+            Token::Function => "FUNCTION",
+            Token::Let => "LET",
+            Token::True => "true",
+            Token::False => "false",
+            Token::If => "if",
+            Token::Else => "else",
+            Token::Return => "return",
+            Token::Macro => "macro",
         };
 
-        write!(f, "{}", str_val)
+        String::from(token_type)
+    }
+
+    pub fn literal(&self) -> &str {
+        match self {
+            Token::Illegal(val) => &val,
+            Token::Eof => "",
+            Token::Ident(val) => &val,
+            Token::Int(val) => &val,
+            Token::Assign => "=",
+            Token::Plus => "+",
+            Token::Minus => "-",
+            Token::Bang => "!",
+            Token::Asterisk => "*",
+            Token::Slash => "/",
+            Token::LessThan => "<",
+            Token::GreaterThan => ">",
+            Token::Comma => ",",
+            Token::SemiColon => ";",
+            Token::Lparen => "(",
+            Token::Rparen => ")",
+            Token::Lbrace => "{",
+            Token::Rbrace => "}",
+            Token::Eq => "==",
+            Token::NotEq => "!=",
+            Token::String(val) => &val,
+            Token::Lbracket => "[",
+            Token::Rbracket => "]",
+            Token::Colon => ":",
+            Token::Function => "fn",
+            Token::Let => "let",
+            Token::True => "true",
+            Token::False => "false",
+            Token::If => "if",
+            Token::Else => "else",
+            Token::Return => "return",
+            Token::Macro => "macro",
+        }
     }
 }
