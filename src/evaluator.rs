@@ -1,6 +1,6 @@
 use crate::ast::*;
 use crate::builtins;
-use crate::environment::Environment;
+use crate::environment::EnvironmentPtr;
 use crate::object::{FunctionObject, MacroObject, Object};
 use crate::token::Token;
 use std::collections::HashMap;
@@ -23,7 +23,7 @@ impl Evaluator {
         }
     }
 
-    pub fn eval(&self, program: Program, env: &mut Environment) -> Object {
+    pub fn eval(&self, program: Program, env: &EnvironmentPtr) -> Object {
         let mut result = Object::Null;
         for stmt in program.statements {
             result = self.eval_statement(stmt, env);
@@ -36,7 +36,7 @@ impl Evaluator {
         result
     }
 
-    fn eval_statement(&self, stmt: Statement, env: &mut Environment) -> Object {
+    fn eval_statement(&self, stmt: Statement, env: &EnvironmentPtr) -> Object {
         match stmt {
             Statement::Expression(expr_stmt) => self.eval_expression(expr_stmt.expression, env),
             Statement::Block(block_stmt) => self.eval_block_statement(block_stmt, env),
@@ -61,7 +61,7 @@ impl Evaluator {
         }
     }
 
-    fn eval_expression(&self, expr: Expression, env: &mut Environment) -> Object {
+    fn eval_expression(&self, expr: Expression, env: &EnvironmentPtr) -> Object {
         match expr {
             Expression::Int(intv) => Object::Integer(intv.value),
             Expression::Boolean(boolv) => Object::Boolean(boolv.value),
@@ -229,7 +229,7 @@ impl Evaluator {
         }
     }
 
-    fn eval_if_expression(&self, if_expr: IfExpression, env: &mut Environment) -> Object {
+    fn eval_if_expression(&self, if_expr: IfExpression, env: &EnvironmentPtr) -> Object {
         let condition = self.eval_expression(*if_expr.condition, env);
         if let Object::Error(_) = condition {
             return condition;
@@ -252,7 +252,7 @@ impl Evaluator {
     fn eval_block_statement(
         &self,
         block_statement: BlockStatement,
-        env: &mut Environment,
+        env: &EnvironmentPtr,
     ) -> Object {
         let mut result = Object::Null;
         for stmt in block_statement.statements {
@@ -267,9 +267,9 @@ impl Evaluator {
         result
     }
 
-    fn eval_identifier(&self, ident: Identifier, env: &mut Environment) -> Object {
+    fn eval_identifier(&self, ident: Identifier, env: &EnvironmentPtr) -> Object {
         if let Some(val) = env.get(&ident.value) {
-            val.clone()
+            val
         } else if let Some(built_in) = self.builtins.get(&ident.value) {
             built_in.clone()
         } else {
@@ -277,7 +277,7 @@ impl Evaluator {
         }
     }
 
-    fn eval_expressions(&self, exps: Vec<Expression>, env: &mut Environment) -> Vec<Object> {
+    fn eval_expressions(&self, exps: Vec<Expression>, env: &EnvironmentPtr) -> Vec<Object> {
         let mut result = vec![];
 
         for exp in exps {
@@ -323,9 +323,9 @@ impl Evaluator {
         &self,
         parameters: Vec<Expression>,
         args: Vec<Object>,
-        env: Environment,
-    ) -> Environment {
-        let mut env = Environment::new_enclosed(env);
+        env: EnvironmentPtr,
+    ) -> EnvironmentPtr {
+        let env = EnvironmentPtr::new_enclosed(env);
 
         for i in 0..parameters.len() {
             if let Expression::Ident(ident) = &parameters[i] {
@@ -375,7 +375,7 @@ impl Evaluator {
         }
     }
 
-    fn eval_hash_literal(&self, hash: HashLiteral, env: &mut Environment) -> Object {
+    fn eval_hash_literal(&self, hash: HashLiteral, env: &EnvironmentPtr) -> Object {
         let mut map = HashMap::new();
         for (key, value) in hash.pairs {
             let key_obj = self.eval_expression(key, env);
@@ -414,12 +414,12 @@ impl Evaluator {
         }
     }
 
-    fn quote(&self, node: Expression, env: &mut Environment) -> Object {
+    fn quote(&self, node: Expression, env: &EnvironmentPtr) -> Object {
         let node = self.eval_unquote_calls_expr(node, env);
         Object::Quote(node)
     }
 
-    fn eval_unquote_calls_expr(&self, expr: Expression, env: &mut Environment) -> Expression {
+    fn eval_unquote_calls_expr(&self, expr: Expression, env: &EnvironmentPtr) -> Expression {
         match expr {
             Expression::Infix(mut infix_expr) => {
                 *infix_expr.left = self.eval_unquote_calls_expr(*infix_expr.left, env);
@@ -484,7 +484,7 @@ impl Evaluator {
         }
     }
 
-    fn eval_unquote_calls_stmt(&self, stmt: Statement, env: &mut Environment) -> Statement {
+    fn eval_unquote_calls_stmt(&self, stmt: Statement, env: &EnvironmentPtr) -> Statement {
         match stmt {
             Statement::Expression(mut expr_stmt) => {
                 expr_stmt.expression =
@@ -551,7 +551,7 @@ impl Evaluator {
         }
     }
 
-    pub fn define_macros(&self, program: &mut Program, env: &mut Environment) {
+    pub fn define_macros(&self, program: &mut Program, env: &EnvironmentPtr) {
         let mut definitions: Vec<usize> = vec![];
 
         for i in 0..program.statements.len() {
@@ -580,7 +580,7 @@ impl Evaluator {
         return false;
     }
 
-    fn add_macro(&self, statement: &Statement, env: &mut Environment) {
+    fn add_macro(&self, statement: &Statement, env: &EnvironmentPtr) {
         if let Statement::Let(stmt) = statement {
             if let Expression::Macro(mac) = &stmt.value {
                 let mac_obj = Object::Macro(MacroObject {
@@ -596,7 +596,7 @@ impl Evaluator {
         }
     }
 
-    pub fn expand_macros(&self, mut program: Program, env: &mut Environment) -> Program {
+    pub fn expand_macros(&self, mut program: Program, env: &EnvironmentPtr) -> Program {
         for i in 0..program.statements.len() {
             program.statements[i] = self.expand_macro_stmt(program.statements[i].clone(), env);
         }
@@ -604,7 +604,7 @@ impl Evaluator {
         return program;
     }
 
-    fn expand_macro_expr(&self, expr: Expression, env: &mut Environment) -> Expression {
+    fn expand_macro_expr(&self, expr: Expression, env: &EnvironmentPtr) -> Expression {
         match expr {
             Expression::Infix(mut infix_expr) => {
                 *infix_expr.left = self.expand_macro_expr(*infix_expr.left, env);
@@ -679,7 +679,7 @@ impl Evaluator {
         }
     }
 
-    fn expand_macro_stmt(&self, stmt: Statement, env: &mut Environment) -> Statement {
+    fn expand_macro_stmt(&self, stmt: Statement, env: &EnvironmentPtr) -> Statement {
         match stmt {
             Statement::Expression(mut expr_stmt) => {
                 expr_stmt.expression = self.expand_macro_expr(expr_stmt.expression.clone(), env);
@@ -703,12 +703,12 @@ impl Evaluator {
         }
     }
 
-    fn is_macro_call(&self, call_expr: &CallExpression, env: &Environment) -> Option<MacroObject> {
+    fn is_macro_call(&self, call_expr: &CallExpression, env: &EnvironmentPtr) -> Option<MacroObject> {
         if let Expression::Ident(ident) = &*call_expr.function {
             let obj = env.get(&ident.value);
             if obj.is_some() {
                 if let Object::Macro(mac) = obj.unwrap() {
-                    return Some(mac.clone());
+                    return Some(mac);
                 }
             }
         }
@@ -729,10 +729,10 @@ impl Evaluator {
     fn extend_macro_env(
         &self,
         parameters: Vec<Expression>,
-        env: Environment,
+        env: EnvironmentPtr,
         args: Vec<Object>,
-    ) -> Environment {
-        let mut extended = Environment::new_enclosed(env);
+    ) -> EnvironmentPtr {
+        let extended = EnvironmentPtr::new_enclosed(env);
         for (index, param) in parameters.iter().enumerate() {
             if let Expression::Ident(ident) = &param {
                 extended.set(&ident.value, args[index].clone());
@@ -1235,7 +1235,7 @@ mod test {
             let mymacro = macro(x, y) { x + y };
         "#;
 
-        let mut env = Environment::new();
+        let mut env = EnvironmentPtr::new();
         let mut program = test_parse_program(input);
         let evaluator = Evaluator::new();
         evaluator.define_macros(&mut program, &mut env);
@@ -1254,7 +1254,7 @@ mod test {
         );
         assert!(env.get("mymacro").is_some(), "mymacro not in environment");
 
-        let obj = env.get("mymacro").unwrap().clone();
+        let obj = env.get("mymacro").unwrap();
         if let Object::Macro(obj_macro) = &obj {
             assert_eq!(
                 obj_macro.parameters.len(),
@@ -1320,7 +1320,7 @@ mod test {
         for (input, exp) in tests {
             let expected = test_parse_program(exp);
             let mut program = test_parse_program(input);
-            let mut env = Environment::new();
+            let mut env = EnvironmentPtr::new();
             let eval = Evaluator::new();
             eval.define_macros(&mut program, &mut env);
             let expanded = eval.expand_macros(program, &mut env);
@@ -1345,7 +1345,7 @@ mod test {
         let lexer = Lexer::new(input.to_string());
         let mut parser = Parser::new(lexer);
         let program = parser.parse_program();
-        let mut env = Environment::new();
+        let mut env = EnvironmentPtr::new();
         let evaluator = Evaluator::new();
 
         return evaluator.eval(program, &mut env);

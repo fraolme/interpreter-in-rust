@@ -1,6 +1,6 @@
-use environment::Environment;
-use std::{env, fs, io};
+use environment::EnvironmentPtr;
 use object::Object;
+use std::{env, fs, io};
 
 mod ast;
 mod builtins;
@@ -30,14 +30,14 @@ fn main() {
 }
 
 fn execute(content: String) {
-    let mut env = Environment::new();
-    let mut macro_env = Environment::new();
-    match repl::execute(content, &mut env, &mut macro_env) {
+    let env = EnvironmentPtr::new();
+    let macro_env = EnvironmentPtr::new();
+    match repl::execute(content, &env, &macro_env) {
         Ok(obj) => {
             if !matches!(obj, Object::Null) {
                 println!("{}", obj.inspect());
             }
-        },
+        }
         Err(err) => {
             println!("{}", err);
         }

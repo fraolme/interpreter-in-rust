@@ -1,5 +1,5 @@
 use crate::ast::{Expression, Statement};
-use crate::environment::Environment;
+use crate::environment::EnvironmentPtr;
 use std::collections::HashMap;
 use std::fmt;
 use std::hash::{Hash, Hasher};
@@ -95,7 +95,7 @@ impl Hash for Object {
 pub struct FunctionObject {
     pub parameters: Vec<Expression>,
     pub body: Statement,
-    pub env: Environment,
+    pub env: EnvironmentPtr,
 }
 
 impl fmt::Display for FunctionObject {
@@ -119,7 +119,7 @@ type BuiltinFunction = fn(Vec<Object>) -> Object;
 pub struct MacroObject {
     pub parameters: Vec<Expression>,
     pub body: Statement,
-    pub env: Environment,
+    pub env: EnvironmentPtr,
 }
 
 impl fmt::Display for MacroObject {

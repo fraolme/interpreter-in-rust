@@ -1,4 +1,4 @@
-use crate::environment::Environment;
+use crate::environment::EnvironmentPtr;
 use crate::evaluator::Evaluator;
 use crate::lexer::Lexer;
 use crate::object::Object;
@@ -8,8 +8,8 @@ use std::io::{stdout, Stdin, Write};
 const PROMPT: &str = ">> ";
 
 pub fn start(stdin: Stdin) {
-    let mut env = Environment::new();
-    let mut macro_env = Environment::new();
+    let env = EnvironmentPtr::new();
+    let macro_env = EnvironmentPtr::new();
 
     loop {
         let mut buffer = String::new();
@@ -20,7 +20,7 @@ pub fn start(stdin: Stdin) {
 
         stdin.read_line(&mut buffer).expect("Failed to read input");
 
-        match execute(buffer, &mut env, &mut macro_env) {
+        match execute(buffer, &env, &macro_env) {
             Ok(obj) => match obj {
                 Object::Null => continue,
                 other => println!("{}", other.inspect()),
@@ -34,8 +34,8 @@ pub fn start(stdin: Stdin) {
 
 pub fn execute(
     code: String,
-    env: &mut Environment,
-    macro_env: &mut Environment,
+    env: &EnvironmentPtr,
+    macro_env: &EnvironmentPtr,
 ) -> Result<Object, String> {
     let lexer = Lexer::new(code);
     let mut parser = Parser::new(lexer);
