@@ -20,29 +20,41 @@ pub fn start(stdin: Stdin) {
 
         stdin.read_line(&mut buffer).expect("Failed to read input");
 
-        let lexer = Lexer::new(buffer);
-        let mut parser = Parser::new(lexer);
-        let mut program = parser.parse_program();
-        if parser.errors.len() != 0 {
-            println!(
-                "Whoops parser errors:\n {}",
-                parser
-                    .errors
-                    .iter()
-                    .map(|e| format!("\t{}", e))
-                    .collect::<Vec<String>>()
-                    .join("\n")
-            );
-            continue;
-        }
-
-        let evaluator = Evaluator::new();
-        evaluator.define_macros(&mut program, &mut macro_env);
-        let expanded_program = evaluator.expand_macros(program, &mut macro_env);
-        let evaluated = evaluator.eval(expanded_program, &mut env);
-        match evaluated {
-            Object::Null => continue,
-            _ => println!("{}", evaluated.inspect()),
+        match execute(buffer, &mut env, &mut macro_env) {
+            Ok(obj) => match obj {
+                Object::Null => continue,
+                other => println!("{}", other.inspect()),
+            },
+            Err(err) => {
+                println!("{}", err);
+            }
         }
     }
+}
+
+pub fn execute(
+    code: String,
+    env: &mut Environment,
+    macro_env: &mut Environment,
+) -> Result<Object, String> {
+    let lexer = Lexer::new(code);
+    let mut parser = Parser::new(lexer);
+    let mut program = parser.parse_program();
+    if parser.errors.len() != 0 {
+        return Err(format!(
+            "Whoops parser errors:\n {}",
+            parser
+                .errors
+                .iter()
+                .map(|e| format!("\t{}", e))
+                .collect::<Vec<String>>()
+                .join("\n")
+        ));
+    }
+
+    let evaluator = Evaluator::new();
+    evaluator.define_macros(&mut program, macro_env);
+    let expanded_program = evaluator.expand_macros(program, macro_env);
+    let evaluated = evaluator.eval(expanded_program, env);
+    Ok(evaluated)
 }
