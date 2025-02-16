@@ -178,7 +178,7 @@ pub struct Program {
 
 impl Node for Program {
     fn token_literal(&self) -> &str {
-        if self.statements.len() > 0 {
+        if !self.statements.is_empty() {
             self.statements[0].token_literal()
         } else {
             ""
@@ -210,7 +210,7 @@ pub struct LetStatement {
 
 impl Node for LetStatement {
     fn token_literal(&self) -> &str {
-        &self.token.literal()
+        self.token.literal()
     }
 
     fn node_type(&self) -> NodeType {
@@ -237,7 +237,7 @@ pub struct Identifier {
 
 impl Node for Identifier {
     fn token_literal(&self) -> &str {
-        &self.token.literal()
+        self.token.literal()
     }
 
     fn node_type(&self) -> NodeType {
@@ -259,7 +259,7 @@ pub struct ReturnStatement {
 
 impl Node for ReturnStatement {
     fn token_literal(&self) -> &str {
-        &self.token.literal()
+        self.token.literal()
     }
 
     fn node_type(&self) -> NodeType {
@@ -285,7 +285,7 @@ pub struct ExpressionStatement {
 
 impl Node for ExpressionStatement {
     fn token_literal(&self) -> &str {
-        &self.token.literal()
+        self.token.literal()
     }
 
     fn node_type(&self) -> NodeType {
@@ -307,7 +307,7 @@ pub struct IntegerLiteral {
 
 impl Node for IntegerLiteral {
     fn token_literal(&self) -> &str {
-        &self.token.literal()
+        self.token.literal()
     }
 
     fn node_type(&self) -> NodeType {
@@ -330,7 +330,7 @@ pub struct PrefixExpression {
 
 impl Node for PrefixExpression {
     fn token_literal(&self) -> &str {
-        &self.token.literal()
+        self.token.literal()
     }
 
     fn node_type(&self) -> NodeType {
@@ -354,7 +354,7 @@ pub struct InfixExpression {
 
 impl Node for InfixExpression {
     fn token_literal(&self) -> &str {
-        &self.token.literal()
+        self.token.literal()
     }
 
     fn node_type(&self) -> NodeType {
@@ -376,7 +376,7 @@ pub struct BooleanLiteral {
 
 impl Node for BooleanLiteral {
     fn token_literal(&self) -> &str {
-        &self.token.literal()
+        self.token.literal()
     }
 
     fn node_type(&self) -> NodeType {
@@ -400,7 +400,7 @@ pub struct IfExpression {
 
 impl Node for IfExpression {
     fn token_literal(&self) -> &str {
-        &self.token.literal()
+        self.token.literal()
     }
 
     fn node_type(&self) -> NodeType {
@@ -428,7 +428,7 @@ pub struct BlockStatement {
 
 impl Node for BlockStatement {
     fn token_literal(&self) -> &str {
-        &self.token.literal()
+        self.token.literal()
     }
 
     fn node_type(&self) -> NodeType {
@@ -456,7 +456,7 @@ pub struct FunctionLiteral {
 
 impl Node for FunctionLiteral {
     fn token_literal(&self) -> &str {
-        &self.token.literal()
+        self.token.literal()
     }
 
     fn node_type(&self) -> NodeType {
@@ -485,7 +485,7 @@ pub struct CallExpression {
 
 impl Node for CallExpression {
     fn token_literal(&self) -> &str {
-        &self.token.literal()
+        self.token.literal()
     }
 
     fn node_type(&self) -> NodeType {
@@ -513,7 +513,7 @@ pub struct StringLiteral {
 
 impl Node for StringLiteral {
     fn token_literal(&self) -> &str {
-        &self.token.literal()
+        self.token.literal()
     }
 
     fn node_type(&self) -> NodeType {
@@ -535,7 +535,7 @@ pub struct ArrayLiteral {
 
 impl Node for ArrayLiteral {
     fn token_literal(&self) -> &str {
-        &self.token.literal()
+        self.token.literal()
     }
 
     fn node_type(&self) -> NodeType {
@@ -566,7 +566,7 @@ pub struct IndexExpression {
 
 impl Node for IndexExpression {
     fn token_literal(&self) -> &str {
-        &self.token.literal()
+        self.token.literal()
     }
 
     fn node_type(&self) -> NodeType {
@@ -588,7 +588,7 @@ pub struct HashLiteral {
 
 impl Node for HashLiteral {
     fn token_literal(&self) -> &str {
-        &self.token.literal()
+        self.token.literal()
     }
 
     fn node_type(&self) -> NodeType {
@@ -627,7 +627,7 @@ pub struct MacroLiteral {
 
 impl Node for MacroLiteral {
     fn token_literal(&self) -> &str {
-        &self.token.literal()
+        self.token.literal()
     }
 
     fn node_type(&self) -> NodeType {

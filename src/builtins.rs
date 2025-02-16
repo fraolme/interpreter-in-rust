@@ -28,14 +28,14 @@ pub fn first(args: Vec<Object>) -> Object {
 
     match &args[0] {
         Object::String(val) => {
-            if val.len() > 0 {
-                Object::String(val.chars().nth(0).unwrap().to_string())
+            if !val.is_empty() {
+                Object::String(val.chars().next().unwrap().to_string())
             } else {
                 Object::Null
             }
         }
         Object::Array(arr) => {
-            if arr.len() > 0 {
+            if !arr.is_empty() {
                 arr[0].clone()
             } else {
                 Object::Null
@@ -58,14 +58,14 @@ pub fn last(args: Vec<Object>) -> Object {
 
     match &args[0] {
         Object::String(val) => {
-            if val.len() > 0 {
+            if !val.is_empty() {
                 Object::String(val.chars().nth(val.len() - 1).unwrap().to_string())
             } else {
                 Object::Null
             }
         }
         Object::Array(arr) => {
-            if arr.len() > 0 {
+            if !arr.is_empty() {
                 arr[arr.len() - 1].clone()
             } else {
                 Object::Null
@@ -88,14 +88,14 @@ pub fn rest(args: Vec<Object>) -> Object {
 
     match &args[0] {
         Object::String(val) => {
-            if val.len() > 0 {
+            if !val.is_empty() {
                 Object::String(val[1..].to_string())
             } else {
                 Object::Null
             }
         }
         Object::Array(arr) => {
-            if arr.len() > 0 {
+            if !arr.is_empty() {
                 Object::Array(arr[1..].to_vec())
             } else {
                 Object::Null

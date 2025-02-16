@@ -92,10 +92,10 @@ impl Token {
 
     pub fn literal(&self) -> &str {
         match self {
-            Token::Illegal(val) => &val,
+            Token::Illegal(val) => val,
             Token::Eof => "",
-            Token::Ident(val) => &val,
-            Token::Int(val) => &val,
+            Token::Ident(val) => val,
+            Token::Int(val) => val,
             Token::Assign => "=",
             Token::Plus => "+",
             Token::Minus => "-",
@@ -112,7 +112,7 @@ impl Token {
             Token::Rbrace => "}",
             Token::Eq => "==",
             Token::NotEq => "!=",
-            Token::String(val) => &val,
+            Token::String(val) => val,
             Token::Lbracket => "[",
             Token::Rbracket => "]",
             Token::Colon => ":",

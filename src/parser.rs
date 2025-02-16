@@ -247,7 +247,7 @@ impl Parser {
 
         Some(Expression::Prefix(Box::new(PrefixExpression {
             token: cur_token,
-            operator: operator,
+            operator,
             right: Box::new(right_expr),
         })))
     }
@@ -262,7 +262,7 @@ impl Parser {
         Some(Expression::Infix(Box::new(InfixExpression {
             token: cur_token,
             left: Box::new(left),
-            operator: operator,
+            operator,
             right: Box::new(right),
         })))
     }
@@ -308,12 +308,12 @@ impl Parser {
             alternative = Some(self.parse_block_statement());
         }
 
-        return Some(Expression::If(Box::new(IfExpression {
+        Some(Expression::If(Box::new(IfExpression {
             token: cur_token,
             condition: Box::new(condition),
             consequence,
             alternative,
-        })));
+        })))
     }
 
     fn parse_block_statement(&mut self) -> Statement {
@@ -518,11 +518,11 @@ impl Parser {
     }
 
     fn expect_peek(&mut self, token: &Token) -> bool {
-        if self.peek_token_is(&token) {
+        if self.peek_token_is(token) {
             self.next_token();
             true
         } else {
-            self.peek_error(&token);
+            self.peek_error(token);
             false
         }
     }
@@ -1134,7 +1134,7 @@ mod tests {
 
                 for (key, value) in &hash.pairs {
                     if let Expression::String(lit) = key {
-                        test_integer_literal(&value, *expected.get(&lit.to_string()).unwrap());
+                        test_integer_literal(value, *expected.get(&lit.to_string()).unwrap());
                     } else {
                         panic!("key is not ast::StringLiteral. got={}", key);
                     }
@@ -1190,7 +1190,8 @@ mod tests {
                     hash.pairs.len()
                 );
 
-                let mut tests: HashMap<String, Box<dyn Fn(&Expression)>> = HashMap::new();
+                type TestHashPairs = HashMap<String, Box<dyn Fn(&Expression)>>;   
+                let mut tests: TestHashPairs = HashMap::new();
                 tests.insert(
                     "one".to_string(),
                     Box::new(|e: &Expression| {
@@ -1213,7 +1214,7 @@ mod tests {
                 for (key, value) in &hash.pairs {
                     if let Expression::String(lit) = key {
                         let test_func = tests.get(&lit.to_string()).unwrap();
-                        test_func(&value);
+                        test_func(value);
                     } else {
                         panic!("key is not ast::StringLiteral. got={}", key);
                     }
@@ -1282,9 +1283,9 @@ mod tests {
 
         let mut buffer = String::new();
 
-        write!(&mut buffer, "parser has {} errors \n", error_len).unwrap();
+        writeln!(&mut buffer, "parser has {} errors ", error_len).unwrap();
         for msg in &parser.errors {
-            write!(&mut buffer, "parser error: {} \n", msg).unwrap();
+            writeln!(&mut buffer, "parser error: {} ", msg).unwrap();
         }
 
         assert_eq!(error_len, 0, "{}", buffer);

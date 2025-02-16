@@ -56,7 +56,7 @@ impl Evaluator {
                 if let Expression::Ident(ident) = &let_stmt.name {
                     env.set(&ident.value, val);
                 }
-                return Object::Null;
+                Object::Null
             }
         }
     }
@@ -82,7 +82,7 @@ impl Evaluator {
                 if let Object::Error(_) = right {
                     return right;
                 }
-                return self.eval_infix_expression(&infix.operator, left, right);
+                self.eval_infix_expression(&infix.operator, left, right)
             }
             Expression::If(if_expr) => self.eval_if_expression(*if_expr, env),
             Expression::Ident(ident) => self.eval_identifier(ident, env),
@@ -158,7 +158,7 @@ impl Evaluator {
 
     fn eval_minus_prefix_operator_expression(&self, right: Object) -> Object {
         match right {
-            Object::Integer(intv) => Object::Integer(intv * -1),
+            Object::Integer(intv) => Object::Integer(-intv),
             _ => Object::Error(format!("unknown operator: -{}", right.get_type())),
         }
     }
@@ -241,7 +241,7 @@ impl Evaluator {
         };
 
         if cond_val {
-            return self.eval_statement(if_expr.consequence, env);
+            self.eval_statement(if_expr.consequence, env)
         } else if if_expr.alternative.is_some() {
             return self.eval_statement(if_expr.alternative.unwrap(), env);
         } else {
@@ -306,8 +306,8 @@ impl Evaluator {
                         args.len()
                     ));
                 }
-                let mut extended_env = self.extend_function_env(parameters, args, env);
-                let evaluated = self.eval_statement(body, &mut extended_env);
+                let extended_env = self.extend_function_env(parameters, args, env);
+                let evaluated = self.eval_statement(body, &extended_env);
                 if let Object::ReturnValue(wrapped_obj) = evaluated {
                     *wrapped_obj
                 } else {
@@ -376,6 +376,7 @@ impl Evaluator {
     }
 
     fn eval_hash_literal(&self, hash: HashLiteral, env: &EnvironmentPtr) -> Object {
+        #[allow(clippy::mutable_key_type)]
         let mut map = HashMap::new();
         for (key, value) in hash.pairs {
             let key_obj = self.eval_expression(key, env);
@@ -398,19 +399,21 @@ impl Evaluator {
         Object::Hash(map)
     }
 
+
+    #[allow(clippy::mutable_key_type)]
     fn eval_hash_index_expression(&self, hash: HashMap<Object, Object>, key: Object) -> Object {
         if let Object::Integer(_) | Object::Boolean(_) | Object::String(_) = key {
             let val = hash.get(&key);
-            if val.is_none() {
-                return Object::Null;
+            if let Some(val) = val {
+                val.clone()
             } else {
-                return val.unwrap().clone();
+                Object::Null
             }
         } else {
-            return Object::Error(format!(
+            Object::Error(format!(
                 "This type can't be used as a key for a hashmap, got={}",
                 key.get_type()
-            ));
+            ))
         }
     }
 
@@ -424,16 +427,16 @@ impl Evaluator {
             Expression::Infix(mut infix_expr) => {
                 *infix_expr.left = self.eval_unquote_calls_expr(*infix_expr.left, env);
                 *infix_expr.right = self.eval_unquote_calls_expr(*infix_expr.right, env);
-                return Expression::Infix(infix_expr);
+                Expression::Infix(infix_expr)
             }
             Expression::Prefix(mut prefix_expr) => {
                 *prefix_expr.right = self.eval_unquote_calls_expr(*prefix_expr.right, env);
-                return Expression::Prefix(prefix_expr);
+                Expression::Prefix(prefix_expr)
             }
             Expression::Index(mut index_expr) => {
                 *index_expr.left = self.eval_unquote_calls_expr(*index_expr.left, env);
                 *index_expr.index = self.eval_unquote_calls_expr(*index_expr.index, env);
-                return Expression::Index(index_expr);
+                Expression::Index(index_expr)
             }
             Expression::If(mut if_expr) => {
                 *if_expr.condition = self.eval_unquote_calls_expr(*if_expr.condition, env);
@@ -442,7 +445,7 @@ impl Evaluator {
                     if_expr.alternative =
                         Some(self.eval_unquote_calls_stmt(if_expr.alternative.unwrap(), env));
                 }
-                return Expression::If(if_expr);
+                Expression::If(if_expr)
             }
             Expression::Func(mut func_lit) => {
                 for i in 0..func_lit.parameters.len() {
@@ -450,14 +453,14 @@ impl Evaluator {
                         self.eval_unquote_calls_expr(func_lit.parameters[i].clone(), env);
                 }
                 func_lit.body = Box::new(self.eval_unquote_calls_stmt(*func_lit.body, env));
-                return Expression::Func(func_lit);
+                Expression::Func(func_lit)
             }
             Expression::Array(mut arr_lit) => {
                 for i in 0..arr_lit.elements.len() {
                     arr_lit.elements[i] =
                         self.eval_unquote_calls_expr(arr_lit.elements[i].clone(), env);
                 }
-                return Expression::Array(arr_lit);
+                Expression::Array(arr_lit)
             }
             Expression::Hash(mut hash_lit) => {
                 let mut map = HashMap::new();
@@ -467,19 +470,19 @@ impl Evaluator {
                     map.insert(new_key, new_value);
                 }
                 hash_lit.pairs = map;
-                return Expression::Hash(hash_lit);
+                Expression::Hash(hash_lit)
             }
             Expression::Call(mut call_expr) => {
                 if call_expr.function.token_literal() == "unquote" && call_expr.arguments.len() == 1
                 {
                     let unquoted = self.eval_expression(call_expr.arguments.remove(0), env);
-                    return self.convert_object_to_ast_node(unquoted);
+                    Evaluator::convert_object_to_ast_node(unquoted)
                 } else {
-                    return Expression::Call(call_expr);
+                    Expression::Call(call_expr)
                 }
             }
             _ => {
-                return expr;
+                expr
             }
         }
     }
@@ -489,28 +492,28 @@ impl Evaluator {
             Statement::Expression(mut expr_stmt) => {
                 expr_stmt.expression =
                     self.eval_unquote_calls_expr(expr_stmt.expression.clone(), env);
-                return Statement::Expression(expr_stmt);
+                Statement::Expression(expr_stmt)
             }
             Statement::Block(mut block_stmt) => {
                 for i in 0..block_stmt.statements.len() {
                     block_stmt.statements[i] =
                         self.eval_unquote_calls_stmt(block_stmt.statements[i].clone(), env);
                 }
-                return Statement::Block(block_stmt);
+                Statement::Block(block_stmt)
             }
             Statement::Return(mut ret_stmt) => {
                 ret_stmt.return_value =
                     self.eval_unquote_calls_expr(ret_stmt.return_value.clone(), env);
-                return Statement::Return(ret_stmt);
+                Statement::Return(ret_stmt)
             }
             Statement::Let(mut let_stmt) => {
                 let_stmt.value = self.eval_unquote_calls_expr(let_stmt.value, env);
-                return Statement::Let(let_stmt);
+                Statement::Let(let_stmt)
             }
         }
     }
 
-    fn convert_object_to_ast_node(&self, unquoted: Object) -> Expression {
+    fn convert_object_to_ast_node(unquoted: Object) -> Expression {
         match unquoted {
             Object::Integer(intv) => Expression::Int(IntegerLiteral {
                 token: Token::Int(format!("{}", intv)),
@@ -521,13 +524,13 @@ impl Evaluator {
                 value: bv,
             }),
             Object::String(sv) => Expression::String(StringLiteral {
-                token: Token::String(format!("{}", sv)),
-                value: format!("{}", sv),
+                token: Token::String(sv.to_string()),
+                value: sv.to_string(),
             }),
             Object::Array(arr) => {
                 let mut exp_arr = vec![];
                 for item in arr {
-                    exp_arr.push(self.convert_object_to_ast_node(item));
+                    exp_arr.push(Evaluator::convert_object_to_ast_node(item));
                 }
                 Expression::Array(ArrayLiteral {
                     token: Token::Lbracket,
@@ -537,8 +540,8 @@ impl Evaluator {
             Object::Hash(hash) => {
                 let mut exp_hash: HashMap<Expression, Expression> = HashMap::new();
                 for (key, value) in hash {
-                    let new_key = self.convert_object_to_ast_node(key);
-                    let new_value = self.convert_object_to_ast_node(value);
+                    let new_key = Evaluator::convert_object_to_ast_node(key);
+                    let new_value = Evaluator::convert_object_to_ast_node(value);
                     exp_hash.insert(new_key, new_value);
                 }
                 Expression::Hash(HashLiteral {
@@ -577,7 +580,7 @@ impl Evaluator {
             }
         }
 
-        return false;
+        false
     }
 
     fn add_macro(&self, statement: &Statement, env: &EnvironmentPtr) {
@@ -601,7 +604,7 @@ impl Evaluator {
             program.statements[i] = self.expand_macro_stmt(program.statements[i].clone(), env);
         }
 
-        return program;
+        program
     }
 
     fn expand_macro_expr(&self, expr: Expression, env: &EnvironmentPtr) -> Expression {
@@ -609,16 +612,16 @@ impl Evaluator {
             Expression::Infix(mut infix_expr) => {
                 *infix_expr.left = self.expand_macro_expr(*infix_expr.left, env);
                 *infix_expr.right = self.expand_macro_expr(*infix_expr.right, env);
-                return Expression::Infix(infix_expr);
+                Expression::Infix(infix_expr)
             }
             Expression::Prefix(mut prefix_expr) => {
                 *prefix_expr.right = self.expand_macro_expr(*prefix_expr.right, env);
-                return Expression::Prefix(prefix_expr);
+                Expression::Prefix(prefix_expr)
             }
             Expression::Index(mut index_expr) => {
                 *index_expr.left = self.expand_macro_expr(*index_expr.left, env);
                 *index_expr.index = self.expand_macro_expr(*index_expr.index, env);
-                return Expression::Index(index_expr);
+                Expression::Index(index_expr)
             }
             Expression::If(mut if_expr) => {
                 *if_expr.condition = self.expand_macro_expr(*if_expr.condition, env);
@@ -627,7 +630,7 @@ impl Evaluator {
                     if_expr.alternative =
                         Some(self.expand_macro_stmt(if_expr.alternative.unwrap(), env));
                 }
-                return Expression::If(if_expr);
+                Expression::If(if_expr)
             }
             Expression::Func(mut func_lit) => {
                 for i in 0..func_lit.parameters.len() {
@@ -635,13 +638,13 @@ impl Evaluator {
                         self.expand_macro_expr(func_lit.parameters[i].clone(), env);
                 }
                 func_lit.body = Box::new(self.expand_macro_stmt(*func_lit.body, env));
-                return Expression::Func(func_lit);
+                Expression::Func(func_lit)
             }
             Expression::Array(mut arr_lit) => {
                 for i in 0..arr_lit.elements.len() {
                     arr_lit.elements[i] = self.expand_macro_expr(arr_lit.elements[i].clone(), env);
                 }
-                return Expression::Array(arr_lit);
+                Expression::Array(arr_lit)
             }
             Expression::Hash(mut hash_lit) => {
                 let mut map = HashMap::new();
@@ -651,7 +654,7 @@ impl Evaluator {
                     map.insert(new_key, new_value);
                 }
                 hash_lit.pairs = map;
-                return Expression::Hash(hash_lit);
+                Expression::Hash(hash_lit)
             }
             Expression::Call(call_expr) => {
                 let mac = self.is_macro_call(&call_expr, env);
@@ -662,8 +665,8 @@ impl Evaluator {
                         body,
                         env,
                     } = mac.unwrap();
-                    let mut eval_env = self.extend_macro_env(parameters, env, args);
-                    let evaluated = self.eval_statement(body, &mut eval_env);
+                    let eval_env = self.extend_macro_env(parameters, env, args);
+                    let evaluated = self.eval_statement(body, &eval_env);
                     if let Object::Quote(node) = evaluated {
                         return node;
                     } else {
@@ -671,10 +674,10 @@ impl Evaluator {
                     }
                 }
 
-                return Expression::Call(call_expr);
+                Expression::Call(call_expr)
             }
             _ => {
-                return expr;
+                expr
             }
         }
     }
@@ -683,22 +686,22 @@ impl Evaluator {
         match stmt {
             Statement::Expression(mut expr_stmt) => {
                 expr_stmt.expression = self.expand_macro_expr(expr_stmt.expression.clone(), env);
-                return Statement::Expression(expr_stmt);
+                Statement::Expression(expr_stmt)
             }
             Statement::Block(mut block_stmt) => {
                 for i in 0..block_stmt.statements.len() {
                     block_stmt.statements[i] =
                         self.expand_macro_stmt(block_stmt.statements[i].clone(), env);
                 }
-                return Statement::Block(block_stmt);
+                Statement::Block(block_stmt)
             }
             Statement::Return(mut ret_stmt) => {
                 ret_stmt.return_value = self.expand_macro_expr(ret_stmt.return_value.clone(), env);
-                return Statement::Return(ret_stmt);
+                Statement::Return(ret_stmt)
             }
             Statement::Let(mut let_stmt) => {
                 let_stmt.value = self.expand_macro_expr(let_stmt.value, env);
-                return Statement::Let(let_stmt);
+                Statement::Let(let_stmt)
             }
         }
     }
@@ -713,7 +716,7 @@ impl Evaluator {
             }
         }
 
-        return None;
+        None
     }
 
     fn quote_args(&self, exp: CallExpression) -> Vec<Object> {
@@ -1118,6 +1121,7 @@ mod test {
         "#;
         let evaluated = test_eval(input);
         if let Object::Hash(hash) = evaluated {
+            #[allow(clippy::mutable_key_type)]
             let mut expected = HashMap::new();
             expected.insert(Object::String("one".to_string()), 1);
             expected.insert(Object::String("two".to_string()), 2);
@@ -1181,7 +1185,7 @@ mod test {
                     expr.to_string(),
                     expected,
                     "not equal. got={}, want={}",
-                    expr.to_string(),
+                    expr,
                     expected
                 );
             } else {
@@ -1218,7 +1222,7 @@ mod test {
                     expr.to_string(),
                     expected,
                     "not equal. got={}, want={}",
-                    expr.to_string(),
+                    expr,
                     expected
                 );
             } else {
@@ -1235,10 +1239,10 @@ mod test {
             let mymacro = macro(x, y) { x + y };
         "#;
 
-        let mut env = EnvironmentPtr::new();
+        let env = EnvironmentPtr::new();
         let mut program = test_parse_program(input);
         let evaluator = Evaluator::new();
-        evaluator.define_macros(&mut program, &mut env);
+        evaluator.define_macros(&mut program, &env);
 
         assert_eq!(
             program.statements.len(),
@@ -1320,16 +1324,16 @@ mod test {
         for (input, exp) in tests {
             let expected = test_parse_program(exp);
             let mut program = test_parse_program(input);
-            let mut env = EnvironmentPtr::new();
+            let env = EnvironmentPtr::new();
             let eval = Evaluator::new();
-            eval.define_macros(&mut program, &mut env);
-            let expanded = eval.expand_macros(program, &mut env);
+            eval.define_macros(&mut program, &env);
+            let expanded = eval.expand_macros(program, &env);
             assert_eq!(
                 expanded.to_string(),
                 expected.to_string(),
                 "Not equal. want={}, got={}",
-                expected.to_string(),
-                expanded.to_string()
+                expected,
+                expanded
             );
         }
     }
@@ -1338,17 +1342,17 @@ mod test {
     fn test_parse_program(input: &str) -> Program {
         let lexer = Lexer::new(input.to_string());
         let mut parser = Parser::new(lexer);
-        return parser.parse_program();
+        parser.parse_program()
     }
 
     fn test_eval(input: &str) -> Object {
         let lexer = Lexer::new(input.to_string());
         let mut parser = Parser::new(lexer);
         let program = parser.parse_program();
-        let mut env = EnvironmentPtr::new();
+        let env = EnvironmentPtr::new();
         let evaluator = Evaluator::new();
 
-        return evaluator.eval(program, &mut env);
+        evaluator.eval(program, &env)
     }
 
     fn test_integer_object(obj: Object, expected: i64) {

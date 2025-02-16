@@ -40,7 +40,7 @@ pub fn execute(
     let lexer = Lexer::new(code);
     let mut parser = Parser::new(lexer);
     let mut program = parser.parse_program();
-    if parser.errors.len() != 0 {
+    if !parser.errors.is_empty() {
         return Err(format!(
             "Whoops parser errors:\n {}",
             parser
