@@ -44,6 +44,8 @@ impl Parser {
         precedence_map.insert(Token::Asterisk.token_type(), Precedence::Product);
         precedence_map.insert(Token::Lparen.token_type(), Precedence::Call);
         precedence_map.insert(Token::Lbracket.token_type(), Precedence::Index);
+        precedence_map.insert(Token::LessThanOrEq.token_type(), Precedence::LessGreater);
+        precedence_map.insert(Token::GreaterThanOrEq.token_type(), Precedence::LessGreater);
 
         let mut prefix_parse_fns: HashMap<String, PrefixParseFn> = HashMap::new();
         prefix_parse_fns.insert(
@@ -83,6 +85,14 @@ impl Parser {
         );
         infix_parse_fns.insert(Token::Lparen.token_type(), Parser::parse_call_expression);
         infix_parse_fns.insert(Token::Lbracket.token_type(), Parser::parse_index_expression);
+        infix_parse_fns.insert(
+            Token::LessThanOrEq.token_type(),
+            Parser::parse_infix_expression,
+        );
+        infix_parse_fns.insert(
+            Token::GreaterThanOrEq.token_type(),
+            Parser::parse_infix_expression,
+        );
 
         Parser {
             lexer,
@@ -763,6 +773,8 @@ mod tests {
                 "==",
                 Expected::Boolean(false),
             ),
+            ("5<=5;", Expected::Int64(5), "<=", Expected::Int64(5)),
+            ("5>=5;", Expected::Int64(5), ">=", Expected::Int64(5)),
         ];
 
         for (input, left_val, operator, right_val) in infix_tests {
@@ -824,6 +836,13 @@ mod tests {
             (
                 "add(a * b[2], b[1], 2 * [1,2][1])",
                 "add((a * (b[2])), (b[1]), (2 * ([1, 2][1])))",
+            ),
+            ("3 >= 5 == false", "((3 >= 5) == false)"),
+            ("3 <= 5 == true", "((3 <= 5) == true)"),
+            ("5 >= 4 != 3 >= 4", "((5 >= 4) != (3 >= 4))"),
+            (
+                "3 + 4 * 5 <= 3 * 1 + 4 * 5",
+                "((3 + (4 * 5)) <= ((3 * 1) + (4 * 5)))",
             ),
         ];
 
@@ -1190,7 +1209,7 @@ mod tests {
                     hash.pairs.len()
                 );
 
-                type TestHashPairs = HashMap<String, Box<dyn Fn(&Expression)>>;   
+                type TestHashPairs = HashMap<String, Box<dyn Fn(&Expression)>>;
                 let mut tests: TestHashPairs = HashMap::new();
                 tests.insert(
                     "one".to_string(),

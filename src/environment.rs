@@ -1,6 +1,6 @@
 use crate::object::Object;
 use std::collections::HashMap;
-use std::{rc::Rc, cell::RefCell};
+use std::{cell::RefCell, rc::Rc};
 
 #[derive(PartialEq, Eq, Clone)]
 struct Environment {
@@ -26,11 +26,11 @@ impl Environment {
     fn get(&self, name: &str) -> Option<Object> {
         let result = self.store.get(name);
         if let Some(result) = result {
-            return Some(result.clone())
+            return Some(result.clone());
         } else if self.outer.is_some() {
             let result = self.outer.as_ref().unwrap().get(name);
             if let Some(result) = result {
-                return Some(result.clone())
+                return Some(result.clone());
             }
         }
 

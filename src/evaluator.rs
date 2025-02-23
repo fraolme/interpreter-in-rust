@@ -212,6 +212,8 @@ impl Evaluator {
             ">" => Object::Boolean(left_val > right_val),
             "==" => Object::Boolean(left_val == right_val),
             "!=" => Object::Boolean(left_val != right_val),
+            ">=" => Object::Boolean(left_val >= right_val),
+            "<=" => Object::Boolean(left_val <= right_val),
             _ => Object::Error(format!("unknown operator: INTEGER {} INTEGER", operator)),
         }
     }
@@ -399,7 +401,6 @@ impl Evaluator {
         Object::Hash(map)
     }
 
-
     #[allow(clippy::mutable_key_type)]
     fn eval_hash_index_expression(&self, hash: HashMap<Object, Object>, key: Object) -> Object {
         if let Object::Integer(_) | Object::Boolean(_) | Object::String(_) = key {
@@ -481,9 +482,7 @@ impl Evaluator {
                     Expression::Call(call_expr)
                 }
             }
-            _ => {
-                expr
-            }
+            _ => expr,
         }
     }
 
@@ -676,9 +675,7 @@ impl Evaluator {
 
                 Expression::Call(call_expr)
             }
-            _ => {
-                expr
-            }
+            _ => expr,
         }
     }
 
@@ -706,7 +703,11 @@ impl Evaluator {
         }
     }
 
-    fn is_macro_call(&self, call_expr: &CallExpression, env: &EnvironmentPtr) -> Option<MacroObject> {
+    fn is_macro_call(
+        &self,
+        call_expr: &CallExpression,
+        env: &EnvironmentPtr,
+    ) -> Option<MacroObject> {
         if let Expression::Ident(ident) = &*call_expr.function {
             let obj = env.get(&ident.value);
             if obj.is_some() {
@@ -806,6 +807,12 @@ mod test {
             ("(1 < 2) == false", false),
             ("(1 > 2) == true", false),
             ("(1 > 2) == false", true),
+            ("(1 <= 2) == true", true),
+            ("(1 <= 2) == false", false),
+            ("(1 >= 2) == true", false),
+            ("(1 >= 2) == false", true),
+            ("(1 >= 1) == true", true),
+            ("(1 <= 1) == true", true),
         ];
 
         for (input, expected) in tests {

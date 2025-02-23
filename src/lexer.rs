@@ -61,8 +61,22 @@ impl Lexer {
             }
             '/' => Token::Slash,
             '*' => Token::Asterisk,
-            '<' => Token::LessThan,
-            '>' => Token::GreaterThan,
+            '<' => {
+                if self.peek_char() == '=' {
+                    self.read_char();
+                    Token::LessThanOrEq
+                } else {
+                    Token::LessThan
+                }
+            }
+            '>' => {
+                if self.peek_char() == '=' {
+                    self.read_char();
+                    Token::GreaterThanOrEq
+                } else {
+                    Token::GreaterThan
+                }
+            }
             '{' => Token::Lbrace,
             '}' => Token::Rbrace,
             '[' => Token::Lbracket,
@@ -174,6 +188,9 @@ mod tests {
           [1, 2];
           {"foo": "bar"}
           macro(x, y) {x + y; };
+
+          10 >= 9;
+          20 <= 35;
         "#,
         );
 
@@ -277,6 +294,14 @@ mod tests {
             (Token::Ident("y".to_string()), "y"),
             (Token::SemiColon, ";"),
             (Token::Rbrace, "}"),
+            (Token::SemiColon, ";"),
+            (Token::Int("10".to_string()), "10"),
+            (Token::GreaterThanOrEq, ">="),
+            (Token::Int("9".to_string()), "9"),
+            (Token::SemiColon, ";"),
+            (Token::Int("20".to_string()), "20"),
+            (Token::LessThanOrEq, "<="),
+            (Token::Int("35".to_string()), "35"),
             (Token::SemiColon, ";"),
             (Token::Eof, ""),
         ];
